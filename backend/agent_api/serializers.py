@@ -4,16 +4,18 @@ from rest_framework import serializers
 from agent_api.models import Task, ExecutionStep
 
 
-class ExecutionStepSerializer(serializers.HyperlinkedModelSerializer):
-    """Serializer for the ExecutionStep model."""
+class ExecutionStepSerializer(serializers.ModelSerializer):
+    """Serializer for the ExecutionStep model. Nested only — steps have no endpoint of their own."""
     class Meta:
         model = ExecutionStep
-        fields = ["url", "step_number", "description", "tool_name", "timestamp"]
+        fields = ["step_number", "description", "tool_name", "timestamp"]
 
 
 class TaskSerializer(serializers.HyperlinkedModelSerializer):
     """Serializer for the Task model, including its execution steps."""
-    steps = ExecutionStepSerializer(many=True, read_only=True)
+    steps = ExecutionStepSerializer(
+        many=True, read_only=True, help_text="Ordered execution trace produced by the agent."
+    )
 
     class Meta:
         model = Task

@@ -3,11 +3,10 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
 from rest_framework.renderers import JSONOpenAPIRenderer
 
-from agent_api.views import TaskViewSet, ExecutionStepViewSet
+from agent_api.views import TaskViewSet
 
 router = DefaultRouter()
 router.register(r"tasks", TaskViewSet)
-router.register(r"steps", ExecutionStepViewSet)
 
 # JSON-only renderer: avoids adding pyyaml as a dependency just for the
 # equivalent YAML output. Auto-generated from the router/viewsets/serializers

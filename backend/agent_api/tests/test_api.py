@@ -19,7 +19,6 @@ def test_create_task_returns_201_with_steps(db, client):
     assert len(data["steps"]) == 4
     assert data["steps"][0]["tool_name"] is None
     assert data["url"].endswith(f"/api/tasks/{data['id']}/")
-    assert data["steps"][0]["url"].startswith("http://testserver/api/steps/")
 
 
 def test_create_task_multi_step(db, client):
@@ -90,35 +89,16 @@ def test_retrieve_missing_task_returns_404(db, client):
     assert "detail" in response.json()
 
 
-def test_steps_endpoint_is_read_only_and_lists_all_steps(db, client):
-    """Test that /api/steps/ exposes every execution step and rejects writes."""
-    AgentController().run("What is 1 + 1?")
+def test_task_write_and_delete_verbs_not_allowed(db, client):
+    """Test that PUT/PATCH/DELETE are not exposed on tasks — only list/create/retrieve are."""
+    task = AgentController().run("What is 1 + 1?")
 
+    assert client.put(f"/api/tasks/{task.id}/", {"prompt": "x"}, format="json").status_code == 405
+    assert client.patch(f"/api/tasks/{task.id}/", {"prompt": "x"}, format="json").status_code == 405
+    assert client.delete(f"/api/tasks/{task.id}/").status_code == 405
+
+
+def test_steps_endpoint_no_longer_exists(db, client):
+    """Test that /api/steps/ was removed — steps are only ever nested inside a task response."""
     response = client.get("/api/steps/")
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 4
-    assert "url" in data[0]
-
-    response = client.post("/api/steps/", {"description": "hand-crafted"}, format="json")
-    assert response.status_code == 405
-
-
-def test_update_task_prompt_via_put(db, client):
-    """Test that PUT on a task updates the writable prompt field but not agent-managed fields."""
-    task = AgentController().run("What is 1 + 1?")
-
-    response = client.put(f"/api/tasks/{task.id}/", {"prompt": "edited prompt"}, format="json")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["prompt"] == "edited prompt"
-    assert data["result"] == "2"  # result is read-only, untouched by the edit
-
-
-def test_delete_task(db, client):
-    """Test that DELETE removes a task."""
-    task = AgentController().run("What is 1 + 1?")
-
-    response = client.delete(f"/api/tasks/{task.id}/")
-    assert response.status_code == 204
-    assert client.get(f"/api/tasks/{task.id}/").status_code == 404
+    assert response.status_code == 404
