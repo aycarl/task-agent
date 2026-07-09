@@ -4,7 +4,7 @@ Single source of truth for backend↔frontend integration. `backend/IMPLEMENTATI
 
 Base URL (dev): `http://localhost:8000/api`
 
-Built on DRF `ModelViewSet`s behind a `DefaultRouter`, with `HyperlinkedModelSerializer`s — every object carries a `url` to itself instead of (well, in addition to) a bare `id`. `GET /api/` is the DRF browsable API root, linking to `tasks` and `steps`.
+Built on a DRF viewset behind a `DefaultRouter`, exposing only `list`/`create`/`retrieve` — the frontend never edits or deletes a task, so those verbs aren't exposed. `Task` uses a `HyperlinkedModelSerializer` (every task carries a `url` to itself); nested `steps` are plain, unlinked objects — they have no endpoint of their own. `GET /api/` is the DRF browsable API root.
 
 ## `POST /api/tasks/`
 
@@ -26,10 +26,10 @@ Response `201 Created`:
   "result": "42",
   "created_at": "2026-07-09T12:00:00Z",
   "steps": [
-    { "url": "http://localhost:8000/api/steps/1/", "step_number": 1, "description": "Received input \"What is 15 + 27?\"", "tool_name": null, "timestamp": "2026-07-09T12:00:00Z" },
-    { "url": "http://localhost:8000/api/steps/2/", "step_number": 2, "description": "Selected tool: CalculatorTool", "tool_name": "CalculatorTool", "timestamp": "2026-07-09T12:00:00Z" },
-    { "url": "http://localhost:8000/api/steps/3/", "step_number": 3, "description": "Tool result: 42", "tool_name": "CalculatorTool", "timestamp": "2026-07-09T12:00:00Z" },
-    { "url": "http://localhost:8000/api/steps/4/", "step_number": 4, "description": "Returning result to user", "tool_name": null, "timestamp": "2026-07-09T12:00:00Z" }
+    { "step_number": 1, "description": "Received input \"What is 15 + 27?\"", "tool_name": null, "timestamp": "2026-07-09T12:00:00Z" },
+    { "step_number": 2, "description": "Selected tool: CalculatorTool", "tool_name": "CalculatorTool", "timestamp": "2026-07-09T12:00:00Z" },
+    { "step_number": 3, "description": "Tool result: 42", "tool_name": "CalculatorTool", "timestamp": "2026-07-09T12:00:00Z" },
+    { "step_number": 4, "description": "Returning result to user", "tool_name": null, "timestamp": "2026-07-09T12:00:00Z" }
   ]
 }
 ```
@@ -65,23 +65,7 @@ Response `404 Not Found` — standard DRF detail shape:
 { "detail": "No Task matches the given query." }
 ```
 
-## `PUT` / `PATCH /api/tasks/{id}/`
-
-Edit a task's `prompt`. Only `prompt` is writable — `result`, `created_at`, and `steps` are read-only, so editing does **not** re-run the agent. Same `400`/`404` shapes as above.
-
-## `DELETE /api/tasks/{id}/`
-
-Delete a task. Cascades to delete its execution steps. Response `204 No Content`.
-
-## `GET /api/steps/` / `GET /api/steps/{id}/`
-
-Read-only. Steps are only ever produced by `AgentController` — there's no client-initiated create/update/delete, so this viewset only exposes `list`/`retrieve` (`POST`/`PUT`/`PATCH`/`DELETE` return `405`). Useful for following a step's `url` out of a task's `steps` array, or browsing steps across all tasks.
-
-Response `200 OK` (single step):
-
-```json
-{ "url": "http://localhost:8000/api/steps/1/", "step_number": 1, "description": "Received input \"What is 15 + 27?\"", "tool_name": null, "timestamp": "2026-07-09T12:00:00Z" }
-```
+`PUT`/`PATCH`/`DELETE` are not exposed on `/api/tasks/{id}/` — the frontend never edits or deletes a task, so those verbs return `405`. There is no `/api/steps/` endpoint either; steps are only ever read as part of a task's `steps` array, never addressed on their own.
 
 ## Execution step shape
 

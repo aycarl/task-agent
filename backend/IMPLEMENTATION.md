@@ -16,7 +16,7 @@ backend/
     ├── tools.py                # BaseTool + 3 tool implementations
     ├── agent.py                # AgentController (routing + execution loop)
     ├── serializers.py
-    ├── views.py                 # ModelViewSet + ReadOnlyModelViewSet, routed via DefaultRouter
+    ├── views.py                 # list/create/retrieve-only viewset, routed via DefaultRouter
     ├── urls.py
     └── tests/
         ├── test_tools.py
@@ -181,19 +181,20 @@ class AgentController:
 
 ## `serializers.py` / `views.py` / `urls.py`
 
-`HyperlinkedModelSerializer` + `ModelViewSet` behind a `DefaultRouter` — every object carries a `url` to itself, and the endpoint set follows DRF's standard viewset conventions (including `PUT`/`PATCH`/`DELETE` on tasks) rather than a hand-rolled subset. `ExecutionStep` gets its own read-only viewset (`ReadOnlyModelViewSet`) purely so its `url` field has something to resolve to — steps are still only ever produced by `AgentController`, never client-authored. Exact request/response fields: [`docs/api.md`](../docs/api.md).
+`HyperlinkedModelSerializer` for `Task` (every task carries a `url` to itself) behind a `DefaultRouter`, but the viewset only exposes `list`/`create`/`retrieve` — built from individual mixins rather than `ModelViewSet`, so `update`/`partial_update`/`destroy` don't exist rather than being blocked. `ExecutionStep` has no endpoint of its own: it's nested inside a task's `steps` array as a plain `ModelSerializer`, since nothing ever reads a step on its own. Exact request/response fields: [`docs/api.md`](../docs/api.md).
 
-**Why the reversal from plain `APIView`s:** the original design avoided `ModelViewSet`/routers to keep the endpoint surface minimal (no unused verbs, no auto-pagination). That's a reasonable default, but hyperlinked, fully RESTful resources are the more idiomatic DRF shape and were requested explicitly — the trade-off (a larger verb surface on `/tasks/{id}/`, an extra `/steps/` resource) is accepted deliberately here rather than by accident.
+**Why only list/create/retrieve:** the frontend never edits or deletes a task, and never reads a step outside of a task's trace. An earlier pass used full `ModelViewSet`s for both `Task` and `ExecutionStep` (matching DRF's idiomatic default), but that meant carrying unused `PUT`/`PATCH`/`DELETE` on tasks and a whole `/api/steps/` resource that existed only to give `ExecutionStep`'s hyperlink field somewhere to resolve to. Trimmed back down once the actual frontend usage was clear — same principle as the original plain-`APIView` decision, reached by a different path.
 
 ```python
 # serializers.py
 from rest_framework import serializers
 from .models import Task, ExecutionStep
 
-class ExecutionStepSerializer(serializers.HyperlinkedModelSerializer):
+class ExecutionStepSerializer(serializers.ModelSerializer):
+    """Nested only — steps have no endpoint of their own."""
     class Meta:
         model = ExecutionStep
-        fields = ["url", "step_number", "description", "tool_name", "timestamp"]
+        fields = ["step_number", "description", "tool_name", "timestamp"]
 
 class TaskSerializer(serializers.HyperlinkedModelSerializer):
     steps = ExecutionStepSerializer(many=True, read_only=True)
@@ -217,12 +218,14 @@ class TaskListSerializer(serializers.HyperlinkedModelSerializer):
 
 ```python
 # views.py
-from rest_framework import viewsets
-from .models import Task, ExecutionStep
-from .serializers import TaskSerializer, TaskListSerializer, ExecutionStepSerializer
+from rest_framework import mixins, viewsets
+from .models import Task
+from .serializers import TaskSerializer, TaskListSerializer
 from .agent import AgentController
 
-class TaskViewSet(viewsets.ModelViewSet):
+class TaskViewSet(
+    mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet,
+):
     queryset = Task.objects.order_by("-created_at")
 
     def get_serializer_class(self):
@@ -233,28 +236,21 @@ class TaskViewSet(viewsets.ModelViewSet):
         # populates result/steps, so we run it here instead of serializer.save().
         task = AgentController().run(serializer.validated_data["prompt"])
         serializer.instance = task
-
-class ExecutionStepViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ExecutionStep.objects.select_related("task")
-    serializer_class = ExecutionStepSerializer
 ```
 
 ```python
 # urls.py
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from .views import TaskViewSet, ExecutionStepViewSet
+from .views import TaskViewSet
 
 router = DefaultRouter()
 router.register(r"tasks", TaskViewSet)
-router.register(r"steps", ExecutionStepViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),
 ]
 ```
-
-Router basenames are left to auto-infer (`task`, `executionstep`) rather than being passed explicitly — `HyperlinkedModelSerializer`'s default `view_name` for a field is `"{model_name}-detail"`, and `DefaultRouter.get_default_basename` derives the same `{model_name}` from `queryset.model._meta.object_name.lower()`. Passing a custom `basename` (e.g. `"step"` for `/steps/`) would desync the two and break hyperlink resolution, so the URL prefix (`steps/`) and the basename (`executionstep`) are intentionally allowed to differ.
 
 ## Tests
 
