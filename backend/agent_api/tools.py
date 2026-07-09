@@ -7,6 +7,7 @@ import re
 
 class BaseTool(ABC):
     """Abstract base class for tools used by the agent API."""
+
     name: str
 
     @abstractmethod
@@ -82,7 +83,9 @@ class CalculatorTool(BaseTool):
     def run(self, prompt: str) -> str:
         expr = self._extract_expression(prompt)
         if expr is None:
-            raise ToolError(f"Could not parse a valid arithmetic expression from: {prompt!r}")
+            raise ToolError(
+                f"Could not parse a valid arithmetic expression from: {prompt!r}"
+            )
         try:
             return self._evaluate_expression(expr)
         except ZeroDivisionError as exc:
@@ -93,14 +96,19 @@ class CalculatorTool(BaseTool):
 
 class TextProcessorTool(BaseTool):
     """Tool for processing text, including case conversion and word counting."""
+
     name = "TextProcessorTool"
 
     def can_handle(self, prompt: str) -> bool:
-        return any(k in prompt.lower() for k in ["uppercase", "lowercase", "word count"])
+        return any(
+            k in prompt.lower() for k in ["uppercase", "lowercase", "word count"]
+        )
 
     def run(self, prompt: str) -> str:
         lower = prompt.lower()
-        text = re.sub(r"(convert|to|uppercase|lowercase|word count|of)", "", lower, flags=re.I).strip(" '\"")
+        text = re.sub(
+            r"(convert|to|uppercase|lowercase|word count|of)", "", lower, flags=re.I
+        ).strip(" '\"")
         if "uppercase" in lower:
             return text.upper()
         if "lowercase" in lower:
@@ -112,8 +120,13 @@ class TextProcessorTool(BaseTool):
 
 class WeatherMockTool(BaseTool):
     """Mock tool for fetching weather information."""
+
     name = "WeatherMockTool"
-    _MOCK_DATA = {"toronto": "18°C, Cloudy", "vancouver": "15°C, Rainy", "montreal": "20°C, Sunny"}
+    _MOCK_DATA = {
+        "toronto": "18°C, Cloudy",
+        "vancouver": "15°C, Rainy",
+        "montreal": "20°C, Sunny",
+    }
 
     def can_handle(self, prompt: str) -> bool:
         return "weather" in prompt.lower()

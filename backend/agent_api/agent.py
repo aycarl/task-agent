@@ -46,7 +46,8 @@ class AgentController:
         Returns:
             Task: The Task object containing the final result and execution steps.
         """
-        task = Task.objects.create(prompt=prompt)
+        task = Task(prompt=prompt)
+        task.save()
         step_num = 1
 
         def log(description, tool_name=None):
@@ -57,12 +58,13 @@ class AgentController:
                 tool_name (str, optional): Name of the tool used in this step. Defaults to None.
             """
             nonlocal step_num
-            ExecutionStep.objects.create(
+            step = ExecutionStep(
                 task=task,
                 step_number=step_num,
                 description=description,
                 tool_name=tool_name,
             )
+            step.save()
             step_num += 1
 
         log(f'Received input "{prompt}"')
