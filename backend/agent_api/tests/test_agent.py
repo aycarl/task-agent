@@ -1,7 +1,11 @@
+# pylint: disable=no-member,unused-argument
+"""Unit tests for the AgentController class in the agent_api module."""
+
 from agent_api.agent import AgentController
 
 
 def test_single_tool_trace_has_expected_steps(db):
+    """Test that a single tool execution produces the expected steps in the task trace."""
     task = AgentController().run("Convert 'hi' to uppercase")
     descriptions = [s.description for s in task.steps.all()]
     assert descriptions[0].startswith("Received input")
@@ -10,6 +14,7 @@ def test_single_tool_trace_has_expected_steps(db):
 
 
 def test_multi_step_chains_two_tools(db):
+    """Test that a multi-step prompt involving two tools produces the expected steps and result."""
     task = AgentController().run("What is 2 + 2 and weather in Toronto")
     tool_names = [s.tool_name for s in task.steps.all() if s.tool_name]
     assert "CalculatorTool" in tool_names and "WeatherMockTool" in tool_names
@@ -17,6 +22,7 @@ def test_multi_step_chains_two_tools(db):
 
 
 def test_unmatched_prompt_logs_no_matching_tool(db):
+    """Test that an unmatched prompt logs a step indicating no matching tool was found."""
     task = AgentController().run("tell me a joke")
     descriptions = [s.description for s in task.steps.all()]
     assert any("No matching tool" in d for d in descriptions)

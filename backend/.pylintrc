@@ -1,10 +1,13 @@
 [MASTER]
 jobs=0
 ignore-paths=^agent_api/migrations/.*$
+load-plugins=pylint_django,pylint_pytest
 
 [TYPECHECK]
 # Avoid noisy unresolved imports from environment/editor mismatch.
 ignored-modules=django,rest_framework,pytest
+# Django adds model/relation attributes dynamically (e.g. Task.steps).
+generated-members=objects,DoesNotExist,MultipleObjectsReturned,steps
 
 [MESSAGES CONTROL]
 disable=
@@ -24,3 +27,6 @@ good-names=i,j,k,pk,db,qs
 
 [REPORTS]
 score=no
+
+[PYLINT_DJANGO]
+django-settings-module=config.settings
