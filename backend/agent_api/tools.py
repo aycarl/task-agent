@@ -2,7 +2,9 @@
 
 import ast
 from abc import ABC, abstractmethod
+from datetime import date, datetime, timezone
 import re
+from zoneinfo import ZoneInfo
 
 
 class BaseTool(ABC):
@@ -136,3 +138,66 @@ class WeatherMockTool(BaseTool):
             if city in prompt.lower():
                 return f"{city.title()}: {forecast}"
         return "No mock data for that city (defaulting): 20°C, Clear"
+
+
+class DaysSinceTool(BaseTool):
+    """Tool for counting the days since (or until) a calendar date."""
+
+    name = "DaysSinceTool"
+    # Each pattern pairs a regex that finds the date substring with the
+    # strptime formats to try on it (commas stripped first).
+    _DATE_PATTERNS = [
+        (re.compile(r"\d{4}-\d{2}-\d{2}"), ["%Y-%m-%d"]),
+        (re.compile(r"[A-Za-z]+ \d{1,2},? \d{4}"), ["%B %d %Y", "%b %d %Y"]),
+    ]
+
+    def _extract_date(self, prompt: str) -> date | None:
+        """Return the first parseable date found in prompt, or None."""
+        for pattern, formats in self._DATE_PATTERNS:
+            match = pattern.search(prompt)
+            if not match:
+                continue
+            text = match.group().replace(",", "")
+            for fmt in formats:
+                try:
+                    return datetime.strptime(text, fmt).date()
+                except ValueError:
+                    continue
+        return None
+
+    def can_handle(self, prompt: str) -> bool:
+        return "days since" in prompt.lower() or "days until" in prompt.lower()
+
+    def run(self, prompt: str) -> str:
+        parsed = self._extract_date(prompt)
+        if parsed is None:
+            raise ToolError(f"Could not parse a date from: {prompt!r}")
+        delta = (date.today() - parsed).days
+        if delta >= 0:
+            return f"{delta} days since {parsed.isoformat()}"
+        return f"{-delta} days until {parsed.isoformat()}"
+
+
+class CityTimeTool(BaseTool):
+    """Tool for reporting the current time in a city."""
+
+    name = "CityTimeTool"
+    _CITY_ZONES = {
+        "toronto": "America/Toronto",
+        "vancouver": "America/Vancouver",
+        "montreal": "America/Toronto",
+        "london": "Europe/London",
+        "tokyo": "Asia/Tokyo",
+    }
+
+    def can_handle(self, prompt: str) -> bool:
+        return "time in" in prompt.lower() or "current time" in prompt.lower()
+
+    def run(self, prompt: str) -> str:
+        lower = prompt.lower()
+        for city, zone in self._CITY_ZONES.items():
+            if city in lower:
+                now = datetime.now(ZoneInfo(zone))
+                return f"{city.title()}: {now.strftime('%H:%M')} ({now.strftime('%Z')})"
+        now = datetime.now(timezone.utc)
+        return f"No timezone data for that city (defaulting to UTC): {now.strftime('%H:%M')}"
