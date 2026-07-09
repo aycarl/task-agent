@@ -1,8 +1,12 @@
+"""Tools module for the agent API."""
+
+import ast
 from abc import ABC, abstractmethod
 import re
 
 
 class BaseTool(ABC):
+    """Abstract base class for tools used by the agent API."""
     name: str
 
     @abstractmethod
@@ -15,33 +19,80 @@ class BaseTool(ABC):
 
 
 class ToolError(Exception):
-    pass
+    """Custom exception for tool errors."""
 
 
 class CalculatorTool(BaseTool):
+    """Tool for evaluating simple arithmetic expressions."""
+
     name = "CalculatorTool"
     _EXPR = re.compile(r"^[\d\.\s\+\-\*\/\(\)]+$")
 
+    def _extract_expression(self, prompt: str) -> str | None:
+        """Return a strict arithmetic expression extracted from prompt, or None."""
+        candidate = re.sub(r"[^\d\.\s\+\-\*/\(\)]", "", prompt).strip()
+        if not candidate:
+            return None
+        if not self._EXPR.fullmatch(candidate):
+            return None
+        if not re.search(r"\d", candidate) or not re.search(r"[\+\-\*/]", candidate):
+            return None
+        return candidate
+
+    def _eval_node(self, node: ast.AST) -> float:
+        if isinstance(node, ast.BinOp):
+            left = self._eval_node(node.left)
+            right = self._eval_node(node.right)
+
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Div):
+                if right == 0:
+                    raise ZeroDivisionError()
+                return left / right
+            raise ValueError("unsupported operator")
+
+        if isinstance(node, ast.UnaryOp):
+            operand = self._eval_node(node.operand)
+            if isinstance(node.op, ast.UAdd):
+                return +operand
+            if isinstance(node.op, ast.USub):
+                return -operand
+            raise ValueError("unsupported unary operator")
+
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return float(node.value)
+
+        raise ValueError("unsupported expression")
+
+    def _evaluate_expression(self, expr: str) -> str:
+        parsed = ast.parse(expr, mode="eval")
+        result = self._eval_node(parsed.body)
+        if result.is_integer():
+            return str(int(result))
+        return str(result)
+
     def can_handle(self, prompt: str) -> bool:
-        return bool(re.search(r"\d+\s*[\+\-\*/]\s*\d+", prompt))
+        return self._extract_expression(prompt) is not None
 
     def run(self, prompt: str) -> str:
-        # Drop everything that isn't part of an expression (e.g. "What is " / "?")
-        # rather than searching for the first run of whitelisted chars — a plain
-        # search would stop at the first stray whitespace between words.
-        expr = re.sub(r"[^\d\.\s\+\-\*/\(\)]", "", prompt).strip()
-        if not expr or not self._EXPR.match(expr):
+        expr = self._extract_expression(prompt)
+        if expr is None:
             raise ToolError(f"Could not parse a valid arithmetic expression from: {prompt!r}")
         try:
-            # Safe: _EXPR whitelists digits/operators/parens only, builtins stripped.
-            return str(eval(expr, {"__builtins__": {}}, {}))
-        except ZeroDivisionError:
-            raise ToolError("Division by zero")
-        except (SyntaxError, TypeError):
-            raise ToolError(f"Could not evaluate expression: {expr!r}")
+            return self._evaluate_expression(expr)
+        except ZeroDivisionError as exc:
+            raise ToolError("Division by zero") from exc
+        except (SyntaxError, TypeError, ValueError) as exc:
+            raise ToolError(f"Could not evaluate expression: {expr!r}") from exc
 
 
 class TextProcessorTool(BaseTool):
+    """Tool for processing text, including case conversion and word counting."""
     name = "TextProcessorTool"
 
     def can_handle(self, prompt: str) -> bool:
@@ -60,6 +111,7 @@ class TextProcessorTool(BaseTool):
 
 
 class WeatherMockTool(BaseTool):
+    """Mock tool for fetching weather information."""
     name = "WeatherMockTool"
     _MOCK_DATA = {"toronto": "18°C, Cloudy", "vancouver": "15°C, Rainy", "montreal": "20°C, Sunny"}
 
