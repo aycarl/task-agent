@@ -2,42 +2,51 @@
 
 A task submitted through the UI is passed to an `AgentController`, which selects and runs a `Tool`, and returns both the final result and a structured execution trace.
 
-## Current state
+## System overview
 
-Both stacks are scaffolded but not yet implemented against the plan below:
+The full round trip, as built:
 
-- **`backend/`** — stock `django-admin startproject` (Django 6.0, project name `config`) plus one app, `agent_api`, generated via `startapp` and not yet registered in `INSTALLED_APPS`. `agent_api/models.py` and `agent_api/views.py` are empty. `backend/config/urls.py` only exposes `/admin/`.
-- **`frontend/`** — stock Vite + React + TypeScript template. No API client, no fetch calls, no dev-server proxy to the backend.
+1. The React frontend (`frontend/src/`) POSTs a prompt to `POST /api/tasks/`.
+2. A DRF viewset hands the prompt to `AgentController` (`backend/agent_api/agent.py`), which splits it on `" and "`, routes each sub-prompt to the first `Tool` whose `can_handle` matches (calculator, text processing, or mock weather), and persists every step as a timestamped `ExecutionStep` row.
+3. The response carries the task, its result, and the ordered trace; the frontend renders the result (`ResultPanel`), the trace (`ExecutionTrace`), and a clickable history of past tasks (`TaskHistory`).
 
-Build detail for each stack: [`backend/IMPLEMENTATION.md`](../backend/IMPLEMENTATION.md), [`frontend/IMPLEMENTATION.md`](../frontend/IMPLEMENTATION.md). API contract: [`api.md`](api.md).
+The backend also serves Swagger UI at `/` (backed by an auto-generated OpenAPI schema at `/api/openapi.json`) and the Django admin at `/admin/`.
+
+Stack-level guides to the code: [`backend/README.md`](../backend/README.md), [`frontend/README.md`](../frontend/README.md). API contract: [`api.md`](api.md).
 
 ## Project layout
 
 ```
 task-agent/
 ├── README.md
+├── docker-compose.yml             # one-command dev environment (both stacks)
+├── docs/                          # architecture / api contract / setup
 ├── backend/
 │   ├── manage.py
 │   ├── requirements.txt
-│   ├── IMPLEMENTATION.md
+│   ├── pytest.ini
+│   ├── README.md                  # backend implementation guide
 │   ├── config/                    # Django project (settings/urls/wsgi)
 │   └── agent_api/                 # single Django app
 │       ├── models.py              # Task, ExecutionStep
 │       ├── tools.py               # BaseTool + 3 tool implementations
 │       ├── agent.py               # AgentController (routing + execution loop)
 │       ├── serializers.py / views.py / urls.py
-│       └── tests/
+│       ├── templates/agent_api/home.html   # Swagger UI homepage
+│       └── tests/                 # test_tools / test_agent / test_api
 └── frontend/
-    ├── IMPLEMENTATION.md
+    ├── README.md                  # frontend implementation guide
     └── src/
-        ├── api.js
-        └── components/            # TaskInput, TaskHistory, ResultPanel, ExecutionTrace
+        ├── api.ts                 # fetch wrappers (+ dormant mock layer)
+        ├── types.ts               # shapes mirroring docs/api.md
+        ├── App.tsx
+        └── components/            # TaskInput, ResultPanel, ExecutionTrace, TaskHistory
 ```
 
 ## Key decisions
 
 **Agent reasoning engine: rule-based, not a real LLM call.**
-Every tool here is deterministic (`WeatherMockTool` is mock data — no external API involved), and a live LLM call would add an API key dependency, network latency, and non-determinism for no real benefit at this scale. A rule-based classifier behind a swappable interface (`select_tool(prompt) -> Tool`, see `agent.py`) demonstrates the actual skill this project is exercising — tool routing / orchestration — without that risk. Worth noting the swap-in point in the root README as a future improvement.
+Every tool here is deterministic (`WeatherMockTool` is mock data — no external API involved), and a live LLM call would add an API key dependency, network latency, and non-determinism for no real benefit at this scale. A rule-based classifier behind a swappable interface (`_select_tool(prompt) -> Tool`, see `backend/agent_api/agent.py`) demonstrates the actual skill this project is exercising — tool routing / orchestration — while leaving a clean seam where a real LLM router could be swapped in without touching callers.
 
 **A DRF viewset behind a router, trimmed to only the verbs the frontend uses.** `Task` uses a `HyperlinkedModelSerializer` (every task carries a `url` to itself) but only exposes `list`/`create`/`retrieve` — built from individual mixins, not `ModelViewSet`, so `update`/`partial_update`/`destroy` don't exist rather than being blocked. `ExecutionStep` has no endpoint or hyperlink of its own; it's nested inside a task's `steps` array as a plain object. An intermediate version gave both models full `ModelViewSet`s (matching DRF's idiomatic default, including a standalone `/api/steps/` resource that existed solely so `ExecutionStep`'s hyperlink field had somewhere to resolve to) — trimmed back down once actual frontend usage made clear that surface was unused, landing close to the original plain-`APIView` minimalism but via DRF's viewset/router machinery instead of hand-rolled views.
 
@@ -55,23 +64,12 @@ Every tool here is deterministic (`WeatherMockTool` is mock data — no external
 | Dynamic tool plugin/registry system | Three tools; a list is sufficient, a plugin system solves a problem that doesn't exist yet |
 | Retry-with-backoff in the agent | Tools are pure functions with no transient failure modes to retry against; errors are caught and logged as a trace step instead |
 
-## Priority for optional/stretch features (highest to lowest signal-per-effort)
+## Build order (as executed)
 
-1. **Tests** — cheap, and testability is the whole point of the tool abstraction.
-2. **Retry/fallback handling in the agent** — basic failure handling in the agent loop (satisfied at the catch-and-log level; see Key Decisions).
-3. **Multi-step reasoning** (chaining >1 tool) — demonstrates tool-calling/orchestration beyond a single call.
-4. **Dockerfile** — near-free polish, do last if time remains.
-5. **Skipped**: real-time streaming and RBAC — see table above.
-
-## Overall build order
-
-1–5. Backend: models → tools → agent → tests → API layer. Detail: [`backend/IMPLEMENTATION.md`](../backend/IMPLEMENTATION.md).
-6. Frontend: `api.js` → `TaskInput` → `ResultPanel` → `ExecutionTrace` → `TaskHistory`. Detail: [`frontend/IMPLEMENTATION.md`](../frontend/IMPLEMENTATION.md).
-7. Root `README.md`: run instructions, dependencies, **assumptions/tradeoffs, time spent, what you'd improve** — cheap, and directly demonstrates thoughtfulness, practicality, and documentation clarity.
-8. If time remains: Dockerfile for backend + frontend.
+Backend first — models → tools → agent → tests → API layer — verified with `pytest` and `curl` before any UI work. Then the frontend against the live API: `api.ts` → `TaskInput` → `ResultPanel` → `ExecutionTrace` → `TaskHistory` (an in-memory mock backend in `api.ts` let the UI develop in parallel; it's still there behind a `USE_MOCK = false` flag). Docs, the root README, and the Docker Compose setup landed last.
 
 ## Why docs are split this way
 
-- [`api.md`](api.md) is the single source of truth for request/response shapes — both stack docs reference it instead of restating it, so the contract can't drift between them.
-- [`backend/IMPLEMENTATION.md`](../backend/IMPLEMENTATION.md) and [`frontend/IMPLEMENTATION.md`](../frontend/IMPLEMENTATION.md) hold stack-local build detail (code, file layout, stack-specific build order) — colocated with the code they describe.
-- This file holds everything that's a project-scope decision rather than a backend-or-frontend one: what's in/out of scope, why, and the order to build in.
+- [`api.md`](api.md) is the single source of truth for request/response shapes — both stack guides reference it instead of restating it, so the contract can't drift between them.
+- [`backend/README.md`](../backend/README.md) and [`frontend/README.md`](../frontend/README.md) hold stack-local implementation detail (code map, request/data flow, how to extend) — colocated with the code they describe.
+- This file holds everything that's a project-scope decision rather than a backend-or-frontend one: what's in/out of scope and why, and how the pieces fit together.

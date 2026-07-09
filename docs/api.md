@@ -1,6 +1,6 @@
 # API Contract
 
-Single source of truth for backend↔frontend integration. `backend/IMPLEMENTATION.md` and `frontend/IMPLEMENTATION.md` both reference this instead of restating request/response shapes — update it first if the contract changes, then update whichever stack plan is affected.
+Single source of truth for backend↔frontend integration. `backend/README.md` and `frontend/README.md` both reference this instead of restating request/response shapes — update it first if the contract changes, then update whichever stack guide is affected.
 
 Base URL (dev): `http://localhost:8000/api`
 
@@ -26,10 +26,30 @@ Response `201 Created`:
   "result": "42",
   "created_at": "2026-07-09T12:00:00Z",
   "steps": [
-    { "step_number": 1, "description": "Received input \"What is 15 + 27?\"", "tool_name": null, "timestamp": "2026-07-09T12:00:00Z" },
-    { "step_number": 2, "description": "Selected tool: CalculatorTool", "tool_name": "CalculatorTool", "timestamp": "2026-07-09T12:00:00Z" },
-    { "step_number": 3, "description": "Tool result: 42", "tool_name": "CalculatorTool", "timestamp": "2026-07-09T12:00:00Z" },
-    { "step_number": 4, "description": "Returning result to user", "tool_name": null, "timestamp": "2026-07-09T12:00:00Z" }
+    {
+      "step_number": 1, 
+      "description": "Received input \"What is 15 + 27?\"", 
+      "tool_name": null, 
+      "timestamp": "2026-07-09T12:00:00Z" 
+    },
+    { 
+      "step_number": 2, 
+      "description": "Selected tool: CalculatorTool", 
+      "tool_name": "CalculatorTool", 
+      "timestamp": "2026-07-09T12:00:00Z" 
+    },
+    {
+      "step_number": 3, 
+      "description": "Tool result: 42", 
+      "tool_name": "CalculatorTool", 
+      "timestamp": "2026-07-09T12:00:00Z"
+    },
+    { 
+      "step_number": 4, 
+      "description": "Returning result to user", 
+      "tool_name": null, 
+      "timestamp": "2026-07-09T12:00:00Z"
+    }
   ]
 }
 ```
@@ -48,8 +68,20 @@ Response `200 OK`:
 
 ```json
 [
-  { "url": "http://localhost:8000/api/tasks/2/", "id": 2, "prompt": "weather in Toronto", "result": "Toronto: 18°C, Cloudy", "created_at": "2026-07-09T12:05:00Z" },
-  { "url": "http://localhost:8000/api/tasks/1/", "id": 1, "prompt": "What is 15 + 27?", "result": "42", "created_at": "2026-07-09T12:00:00Z" }
+  {
+    "url": "http://localhost:8000/api/tasks/2/", 
+    "id": 2, 
+    "prompt": "weather in Toronto", 
+    "result": "Toronto: 18°C, Cloudy", 
+    "created_at": "2026-07-09T12:05:00Z" 
+  },
+  { 
+    "url": "http://localhost:8000/api/tasks/1/", 
+    "id": 1, 
+    "prompt": "What is 15 + 27?", 
+    "result": "42", 
+    "created_at": "2026-07-09T12:00:00Z" 
+  }
 ]
 ```
 
@@ -78,7 +110,7 @@ Step 3: Tool result: HELLO
 Step 4: Returning result to user
 ```
 
-`tool_name` is `null` on bookkeeping steps (received input / returning result) and set on tool-selection and tool-result steps. The frontend's `ExecutionTrace` component uses this to visually distinguish tool-execution steps from bookkeeping ones — see `frontend/IMPLEMENTATION.md`.
+`tool_name` is `null` on bookkeeping steps (received input / returning result) and set on tool-selection and tool-result steps. The frontend's `ExecutionTrace` component uses this to visually distinguish tool-execution steps from bookkeeping ones — see `frontend/README.md`.
 
 Multi-step prompts (e.g. "What is 2 + 2 and weather in Toronto") produce one selected-tool/tool-result pair per matched sub-prompt, all under the same `Task`, still ordered by `step_number`.
 
