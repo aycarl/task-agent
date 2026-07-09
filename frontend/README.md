@@ -2,7 +2,7 @@
 
 React 19 + TypeScript + Vite. Four focused components wired from `App.tsx` with plain `useState`/`useEffect` — no state library, no router, deliberately not a chat UI. The flow is: submit a task → see the result and its execution trace → browse history → click a past task to inspect its trace.
 
-The API contract this consumes is defined in [`docs/api.md`](../docs/api.md); the server side is documented in [`backend/README.md`](../backend/README.md).
+The API contract this consumes is documented by the backend's auto-generated OpenAPI schema (`/api/openapi.json`, rendered by Swagger UI at `/`); the server side is documented in [`backend/README.md`](../backend/README.md).
 
 ## Data flow
 
@@ -16,7 +16,7 @@ The API contract this consumes is defined in [`docs/api.md`](../docs/api.md); th
 | File | What's in it |
 |---|---|
 | `src/api.ts` | `submitTask` / `fetchTasks` / `fetchTask` fetch wrappers against `BASE_URL = http://localhost:8000/api` (hardcoded — the backend allows the Vite origin via CORS; there's no dev-server proxy). Also contains a dormant mock backend behind `USE_MOCK = false`, kept from before the real API existed — flip the flag to demo the UI without a backend, or delete the section below the marker comment. |
-| `src/types.ts` | `ExecutionStep`, `TaskSummary` (list shape, no steps), and `Task extends TaskSummary` (adds `steps`) — mirrors [`docs/api.md`](../docs/api.md). |
+| `src/types.ts` | `ExecutionStep`, `TaskSummary` (list shape, no steps), and `Task extends TaskSummary` (adds `steps`) — mirrors the API response shapes (see the backend's OpenAPI schema). |
 | `src/App.tsx` | State owner: `activeTask`, `isSubmitting`, `error`, `historyVersion`. Wires the four components. |
 | `src/components/TaskInput.tsx` | Controlled input + submit button; ignores empty/whitespace prompts. |
 | `src/components/ResultPanel.tsx` | Renders the active task's prompt and result. |
