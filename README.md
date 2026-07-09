@@ -1,6 +1,6 @@
 # task-agent
 
-> TODO: one or two sentences on what this project does.
+A task submitted through the UI is passed to an `AgentController`, which selects and runs a `Tool` (calculator, text processing, mock weather), then returns the result plus a structured execution trace.
 
 ## Stack
 
@@ -29,9 +29,11 @@ Full setup notes: [docs/setup.md](docs/setup.md).
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — how the pieces fit together (and don't, yet)
+- [docs/architecture.md](docs/architecture.md) — scope, key decisions, overall build order
 - [docs/setup.md](docs/setup.md) — local development setup
-- [docs/api.md](docs/api.md) — API endpoints
+- [docs/api.md](docs/api.md) — API contract (request/response shapes)
+- [backend/IMPLEMENTATION.md](backend/IMPLEMENTATION.md) — backend build plan
+- [frontend/IMPLEMENTATION.md](frontend/IMPLEMENTATION.md) — frontend build plan
 
 ## Project layout
 
