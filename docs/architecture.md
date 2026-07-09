@@ -39,7 +39,7 @@ task-agent/
 **Agent reasoning engine: rule-based, not a real LLM call.**
 Every tool here is deterministic (`WeatherMockTool` is mock data — no external API involved), and a live LLM call would add an API key dependency, network latency, and non-determinism for no real benefit at this scale. A rule-based classifier behind a swappable interface (`select_tool(prompt) -> Tool`, see `agent.py`) demonstrates the actual skill this project is exercising — tool routing / orchestration — without that risk. Worth noting the swap-in point in the root README as a future improvement.
 
-**Plain `APIView`s, not DRF `ModelViewSet`/routers.** Avoids auto-generating PUT/PATCH/DELETE/pagination/filtering nobody needs; keeps the endpoint list small and legible (3 endpoints, 3 view classes).
+**A DRF viewset behind a router, trimmed to only the verbs the frontend uses.** `Task` uses a `HyperlinkedModelSerializer` (every task carries a `url` to itself) but only exposes `list`/`create`/`retrieve` — built from individual mixins, not `ModelViewSet`, so `update`/`partial_update`/`destroy` don't exist rather than being blocked. `ExecutionStep` has no endpoint or hyperlink of its own; it's nested inside a task's `steps` array as a plain object. An intermediate version gave both models full `ModelViewSet`s (matching DRF's idiomatic default, including a standalone `/api/steps/` resource that existed solely so `ExecutionStep`'s hyperlink field had somewhere to resolve to) — trimmed back down once actual frontend usage made clear that surface was unused, landing close to the original plain-`APIView` minimalism but via DRF's viewset/router machinery instead of hand-rolled views.
 
 **Multi-step support via `" and "` splitting**, not a real planning/loop system — demonstrates chaining more than one tool without over-building.
 
@@ -50,7 +50,6 @@ Every tool here is deterministic (`WeatherMockTool` is mock data — no external
 | Feature | Reason skipped |
 |---|---|
 | Real LLM call for intent parsing | Tools here are deterministic by design; a live call adds an API key/latency/non-determinism for no real benefit |
-| DRF ViewSets/routers | Auto-generates unneeded REST verbs; plain APIViews are more legible for 3 endpoints |
 | Real-time streaming (SSE/WS) | High implementation risk for a feature that only needs post-hoc clarity |
 | RBAC / auth | No login/auth requirement in scope — inventing one would be pure scope creep |
 | Dynamic tool plugin/registry system | Three tools; a list is sufficient, a plugin system solves a problem that doesn't exist yet |

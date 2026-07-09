@@ -1,3 +1,6 @@
 from django.contrib import admin
 
-# Register your models here.
+from agent_api.models import Task, ExecutionStep
+
+admin.site.register(Task)
+admin.site.register(ExecutionStep)

@@ -16,7 +16,7 @@ backend/
     ├── tools.py                # BaseTool + 3 tool implementations
     ├── agent.py                # AgentController (routing + execution loop)
     ├── serializers.py
-    ├── views.py                 # plain APIViews, no ViewSets/routers
+    ├── views.py                 # list/create/retrieve-only viewset, routed via DefaultRouter
     ├── urls.py
     └── tests/
         ├── test_tools.py
@@ -181,7 +181,9 @@ class AgentController:
 
 ## `serializers.py` / `views.py` / `urls.py`
 
-Plain `APIView`, not `ModelViewSet` + router — avoids pulling in PUT/PATCH/DELETE/pagination/filtering nobody needs, and keeps the endpoint list small and legible (3 endpoints, 3 view classes). Exact request/response fields: [`docs/api.md`](../docs/api.md).
+`HyperlinkedModelSerializer` for `Task` (every task carries a `url` to itself) behind a `DefaultRouter`, but the viewset only exposes `list`/`create`/`retrieve` — built from individual mixins rather than `ModelViewSet`, so `update`/`partial_update`/`destroy` don't exist rather than being blocked. `ExecutionStep` has no endpoint of its own: it's nested inside a task's `steps` array as a plain `ModelSerializer`, since nothing ever reads a step on its own. Exact request/response fields: [`docs/api.md`](../docs/api.md).
+
+**Why only list/create/retrieve:** the frontend never edits or deletes a task, and never reads a step outside of a task's trace. An earlier pass used full `ModelViewSet`s for both `Task` and `ExecutionStep` (matching DRF's idiomatic default), but that meant carrying unused `PUT`/`PATCH`/`DELETE` on tasks and a whole `/api/steps/` resource that existed only to give `ExecutionStep`'s hyperlink field somewhere to resolve to. Trimmed back down once the actual frontend usage was clear — same principle as the original plain-`APIView` decision, reached by a different path.
 
 ```python
 # serializers.py
@@ -189,60 +191,64 @@ from rest_framework import serializers
 from .models import Task, ExecutionStep
 
 class ExecutionStepSerializer(serializers.ModelSerializer):
+    """Nested only — steps have no endpoint of their own."""
     class Meta:
         model = ExecutionStep
         fields = ["step_number", "description", "tool_name", "timestamp"]
 
-class TaskSerializer(serializers.ModelSerializer):
+class TaskSerializer(serializers.HyperlinkedModelSerializer):
     steps = ExecutionStepSerializer(many=True, read_only=True)
     class Meta:
         model = Task
-        fields = ["id", "prompt", "result", "created_at", "steps"]
+        fields = ["url", "id", "prompt", "result", "created_at", "steps"]
+        read_only_fields = ["result", "created_at"]
 
-class TaskListSerializer(serializers.ModelSerializer):
+    def validate_prompt(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("This field may not be blank.")
+        return value
+
+class TaskListSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Task
-        fields = ["id", "prompt", "result", "created_at"]  # no steps — keep list payload light
+        fields = ["url", "id", "prompt", "result", "created_at"]  # no steps — keep list payload light
+        read_only_fields = ["result", "created_at"]
 ```
 
 ```python
 # views.py
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import mixins, viewsets
 from .models import Task
 from .serializers import TaskSerializer, TaskListSerializer
 from .agent import AgentController
 
-class TaskListCreateView(APIView):
-    def get(self, request):
-        tasks = Task.objects.order_by("-created_at")
-        return Response(TaskListSerializer(tasks, many=True).data)
+class TaskViewSet(
+    mixins.ListModelMixin, mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet,
+):
+    queryset = Task.objects.order_by("-created_at")
 
-    def post(self, request):
-        prompt = request.data.get("prompt", "").strip()
-        if not prompt:
-            return Response({"error": "prompt is required"}, status=status.HTTP_400_BAD_REQUEST)
-        task = AgentController().run(prompt)
-        return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
+    def get_serializer_class(self):
+        return TaskListSerializer if self.action == "list" else TaskSerializer
 
-class TaskDetailView(APIView):
-    def get(self, request, pk):
-        try:
-            task = Task.objects.get(pk=pk)
-        except Task.DoesNotExist:
-            return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(TaskSerializer(task).data)
+    def perform_create(self, serializer):
+        # Creation is agent-driven: AgentController creates the Task itself and
+        # populates result/steps, so we run it here instead of serializer.save().
+        task = AgentController().run(serializer.validated_data["prompt"])
+        serializer.instance = task
 ```
 
 ```python
 # urls.py
-from django.urls import path
-from .views import TaskListCreateView, TaskDetailView
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+from .views import TaskViewSet
+
+router = DefaultRouter()
+router.register(r"tasks", TaskViewSet)
 
 urlpatterns = [
-    path("tasks/", TaskListCreateView.as_view()),
-    path("tasks/<int:pk>/", TaskDetailView.as_view()),
+    path("", include(router.urls)),
 ]
 ```
 
