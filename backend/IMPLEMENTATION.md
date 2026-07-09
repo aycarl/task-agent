@@ -79,8 +79,10 @@ class CalculatorTool(BaseTool):
         return bool(re.search(r"\d+\s*[\+\-\*/]\s*\d+", prompt))
 
     def run(self, prompt: str) -> str:
-        match = re.search(r"[\d\.\s\+\-\*/\(\)]+", prompt)
-        expr = match.group().strip() if match else ""
+        # findall (not search) — search grabs the *first* whitelist-char run, which
+        # can be a lone space before the real expression (e.g. "What is 15 + 27?").
+        matches = re.findall(r"[\d\.\s\+\-\*/\(\)]+", prompt)
+        expr = next((m.strip() for m in matches if re.search(r"\d", m)), "")
         if not expr or not self._EXPR.match(expr):
             raise ToolError(f"Could not parse a valid arithmetic expression from: {prompt!r}")
         try:

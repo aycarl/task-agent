@@ -33,4 +33,4 @@ Runs at the Vite default (`http://localhost:5173/`). `npm run build` type-checks
 
 ## Running both
 
-Two terminals, one per stack, as above. There's no dev-server proxy between them yet — see [architecture.md](architecture.md#next-decisions).
+Two terminals, one per stack, as above. There's no dev-server proxy between them yet — see [architecture.md](architecture.md#key-decisions).
