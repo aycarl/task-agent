@@ -1,6 +1,6 @@
 # task-agent
 
-A task submitted through the UI is passed to an `AgentController`, which selects and runs a `Tool` (calculator, text processing, mock weather), then returns the result plus a structured execution trace. The UI shows the result, past-task history, and the step-by-step trace for any task.
+A task submitted through the UI is passed to an `AgentController`, which selects and runs a `Tool` (calculator, text processing, mock weather, days-since-a-date, current time in a city), then returns the result plus a structured execution trace. The UI shows the result, past-task history, and the step-by-step trace for any task.
 
 ## Tech Stack and Dependencies
 
@@ -67,7 +67,7 @@ Backend on `:8000` (auto-migrates, creates an `admin`/`admin1234` superuser), fr
 
 Full rationale in [docs/architecture.md](docs/architecture.md); the short version:
 
-- **The agent is a rule-based router, not a real LLM call.** All three tools are deterministic, so a live LLM would add an API key, latency, and non-determinism for no benefit at this scale. Tool selection sits behind a swappable interface (`backend/agent_api/agent.py`), so an LLM router could replace it without touching callers.
+- **The agent is a rule-based router, not a real LLM call.** Every tool is deterministic (given the system clock — none calls an external API), so a live LLM would add an API key, latency, and non-determinism for no benefit at this scale. Tool selection sits behind a swappable interface (`backend/agent_api/agent.py`), so an LLM router could replace it without touching callers.
 - **Multi-step prompts are handled by splitting on `" and "`** and running each part through the same router — it demonstrates chaining tools without pretending to be a planner.
 - **No auth/RBAC, no real-time streaming, no tool plugin registry** — deliberately cut as scope creep for three tools and three endpoints.
 - **Dev-only settings**: SQLite, `DEBUG = True`, a checked-in `SECRET_KEY`. Nothing here is production-safe as-is.

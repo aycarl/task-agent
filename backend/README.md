@@ -38,11 +38,13 @@ Every `log(...)` call in the loop persists an `ExecutionStep` row immediately, s
 - **`CalculatorTool`** — extracts an arithmetic expression by stripping every character outside a whitelist (digits, `.`, whitespace, `+-*/()`), then requires the remainder to fully match the whitelist regex and contain at least one digit and one operator. Evaluation is a recursive walk of the `ast.parse` tree (`_eval_node`) that only accepts `BinOp` (+ − × ÷), `UnaryOp` (±), and numeric `Constant` nodes — there is no `eval`, so nothing outside plain arithmetic can execute. Division by zero and malformed expressions raise `ToolError`; whole-number results render without a trailing `.0`.
 - **`TextProcessorTool`** — matches on `uppercase` / `lowercase` / `word count` keywords, strips the instruction words from the prompt, and applies the operation to what remains.
 - **`WeatherMockTool`** — matches on `weather`; returns canned data for Toronto/Vancouver/Montreal and a default response for any other city. No external API.
+- **`DaysSinceTool`** — matches on `days since` / `days until`; finds a date in the prompt (ISO `2024-01-15` or written-out `December 25, 2026`), parses it with `strptime`, and reports the day count against today (future dates phrase as "days until"). No parseable date → `ToolError`.
+- **`CityTimeTool`** — matches on `time in` / `current time`; maps a known city (Toronto, Vancouver, Montreal, London, Tokyo) to its IANA zone via the stdlib `zoneinfo` and reports the current `HH:MM (zone)`; unknown cities fall back to UTC. `tzdata` is pinned in `requirements.txt` so this also works in the slim Docker image.
 
 ### Adding a tool
 
 1. Subclass `BaseTool` in `agent_api/tools.py`: set `name`, implement `can_handle(prompt)` (cheap keyword/regex check) and `run(prompt)` (return plain text; raise `ToolError` on bad input).
-2. Append an instance to `self.tools` in `AgentController.__init__` (`agent_api/agent.py`). **Order matters** — the first `can_handle` match wins, so put more specific tools before broader ones.
+2. Append an instance to `self.tools` in `AgentController.__init__` (`agent_api/agent.py`). **Order matters** — the first `can_handle` match wins, so put more specific tools before broader ones. Live example: `DaysSinceTool` sits ahead of `CalculatorTool` because a bare date like `2024-01-15` parses as arithmetic (`2024 − 01 − 15 = 2008`); `test_agent.py` pins that routing.
 3. Add cases to `tests/test_tools.py` (tool behaviour) and, if routing could be ambiguous, `tests/test_agent.py` (selection).
 
 Nothing else changes: the API layer, serializers, and trace format are tool-agnostic.
@@ -60,6 +62,6 @@ pytest agent_api/tests/test_api.py::test_create_task_returns_201_with_steps   # 
 
 | File | Covers |
 |---|---|
-| `tests/test_tools.py` | Each tool directly: calculator arithmetic incl. parentheses, division-by-zero and malformed input raising `ToolError`; text upper/lower/word-count; weather known city + unknown-city default. |
-| `tests/test_agent.py` | The controller: trace shape for a single-tool run, multi-tool chaining via `" and "`, and the no-matching-tool path. |
+| `tests/test_tools.py` | Each tool directly: calculator arithmetic incl. parentheses, division-by-zero and malformed input raising `ToolError`; text upper/lower/word-count; weather known city + unknown-city default; days-since ISO and written-month dates, future dates, unparseable dates; city time reply shape + UTC fallback. |
+| `tests/test_agent.py` | The controller: trace shape for a single-tool run, multi-tool chaining via `" and "`, the no-matching-tool path, the DaysSince-before-Calculator routing order, and a three-tool chain. |
 | `tests/test_api.py` | The HTTP layer with `APIClient`: 201 with trace, multi-step create, 400 on empty/whitespace/missing prompt, list ordering without `steps`, retrieve with `steps`, 404, 405 on write verbs, and absence of `/api/steps/`. |

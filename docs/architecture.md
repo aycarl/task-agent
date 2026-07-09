@@ -7,7 +7,7 @@ A task submitted through the UI is passed to an `AgentController`, which selects
 The full round trip, as built:
 
 1. The React frontend (`frontend/src/`) POSTs a prompt to `POST /api/tasks/`.
-2. A DRF viewset hands the prompt to `AgentController` (`backend/agent_api/agent.py`), which splits it on `" and "`, routes each sub-prompt to the first `Tool` whose `can_handle` matches (calculator, text processing, or mock weather), and persists every step as a timestamped `ExecutionStep` row.
+2. A DRF viewset hands the prompt to `AgentController` (`backend/agent_api/agent.py`), which splits it on `" and "`, routes each sub-prompt to the first `Tool` whose `can_handle` matches (calculator, text processing, mock weather, days-since-a-date, or city time), and persists every step as a timestamped `ExecutionStep` row.
 3. The response carries the task, its result, and the ordered trace; the frontend renders the result (`ResultPanel`), the trace (`ExecutionTrace`), and a clickable history of past tasks (`TaskHistory`).
 
 The backend also serves Swagger UI at `/` (backed by an auto-generated OpenAPI schema at `/api/openapi.json`) and the Django admin at `/admin/`.
@@ -46,13 +46,13 @@ task-agent/
 ## Key decisions
 
 **Agent reasoning engine: rule-based, not a real LLM call.**
-Every tool here is deterministic (`WeatherMockTool` is mock data — no external API involved), and a live LLM call would add an API key dependency, network latency, and non-determinism for no real benefit at this scale. A rule-based classifier behind a swappable interface (`_select_tool(prompt) -> Tool`, see `backend/agent_api/agent.py`) demonstrates the actual skill this project is exercising — tool routing / orchestration — while leaving a clean seam where a real LLM router could be swapped in without touching callers.
+Every tool here is deterministic given the system clock (`WeatherMockTool` is mock data; `DaysSinceTool`/`CityTimeTool` read the clock — none calls an external API), and a live LLM call would add an API key dependency, network latency, and non-determinism for no real benefit at this scale. A rule-based classifier behind a swappable interface (`_select_tool(prompt) -> Tool`, see `backend/agent_api/agent.py`) demonstrates the actual skill this project is exercising — tool routing / orchestration — while leaving a clean seam where a real LLM router could be swapped in without touching callers.
 
 **A DRF viewset behind a router, trimmed to only the verbs the frontend uses.** `Task` uses a `HyperlinkedModelSerializer` (every task carries a `url` to itself) but only exposes `list`/`create`/`retrieve` — built from individual mixins, not `ModelViewSet`, so `update`/`partial_update`/`destroy` don't exist rather than being blocked. `ExecutionStep` has no endpoint or hyperlink of its own; it's nested inside a task's `steps` array as a plain object. An intermediate version gave both models full `ModelViewSet`s (matching DRF's idiomatic default, including a standalone `/api/steps/` resource that existed solely so `ExecutionStep`'s hyperlink field had somewhere to resolve to) — trimmed back down once actual frontend usage made clear that surface was unused, landing close to the original plain-`APIView` minimalism but via DRF's viewset/router machinery instead of hand-rolled views.
 
 **Multi-step support via `" and "` splitting**, not a real planning/loop system — demonstrates chaining more than one tool without over-building.
 
-**No dynamic tool plugin/registry.** Three tools; an ordered list is sufficient.
+**No dynamic tool plugin/registry.** Five tools; an ordered list is sufficient — and the order is itself load-bearing: `DaysSinceTool` sits ahead of `CalculatorTool` because a bare date like `2024-01-15` parses as arithmetic (`2024 − 01 − 15`), and a test pins that routing.
 
 ## Explicitly out of scope
 
