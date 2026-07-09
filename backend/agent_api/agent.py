@@ -82,7 +82,7 @@ class AgentController:
             tool = self._select_tool(sub)
             if tool is None:
                 log(f'No matching tool for: "{sub}"')
-                outputs.append(f"(unhandled: {sub})")
+                outputs.append(f"(Unavailable tool: {sub})")
                 continue
             log(f"Selected tool: {tool.name}", tool_name=tool.name)
             try:
