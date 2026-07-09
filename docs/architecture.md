@@ -39,7 +39,7 @@ task-agent/
 **Agent reasoning engine: rule-based, not a real LLM call.**
 Every tool here is deterministic (`WeatherMockTool` is mock data — no external API involved), and a live LLM call would add an API key dependency, network latency, and non-determinism for no real benefit at this scale. A rule-based classifier behind a swappable interface (`select_tool(prompt) -> Tool`, see `agent.py`) demonstrates the actual skill this project is exercising — tool routing / orchestration — without that risk. Worth noting the swap-in point in the root README as a future improvement.
 
-**Plain `APIView`s, not DRF `ModelViewSet`/routers.** Avoids auto-generating PUT/PATCH/DELETE/pagination/filtering nobody needs; keeps the endpoint list small and legible (3 endpoints, 3 view classes).
+**DRF `ModelViewSet`s behind a router, with `HyperlinkedModelSerializer`s.** Every object carries a `url` to itself; `Task` gets full CRUD via `ModelViewSet`, `ExecutionStep` gets a read-only viewset (`ReadOnlyModelViewSet`) so its `url` field has something to resolve to, since steps are still only ever produced by `AgentController`. This reverses an earlier decision to use plain `APIView`s to keep the endpoint surface minimal — the hyperlinked/viewset shape was chosen deliberately over that minimalism for a more idiomatic, fully RESTful API.
 
 **Multi-step support via `" and "` splitting**, not a real planning/loop system — demonstrates chaining more than one tool without over-building.
 
@@ -50,7 +50,6 @@ Every tool here is deterministic (`WeatherMockTool` is mock data — no external
 | Feature | Reason skipped |
 |---|---|
 | Real LLM call for intent parsing | Tools here are deterministic by design; a live call adds an API key/latency/non-determinism for no real benefit |
-| DRF ViewSets/routers | Auto-generates unneeded REST verbs; plain APIViews are more legible for 3 endpoints |
 | Real-time streaming (SSE/WS) | High implementation risk for a feature that only needs post-hoc clarity |
 | RBAC / auth | No login/auth requirement in scope — inventing one would be pure scope creep |
 | Dynamic tool plugin/registry system | Three tools; a list is sufficient, a plugin system solves a problem that doesn't exist yet |

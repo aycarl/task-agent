@@ -3,7 +3,7 @@ import type { ExecutionStep, Task, TaskSummary } from './types';
 const BASE_URL = 'http://localhost:8000/api';
 
 // TODO: remove mock layer once POST/GET /api/tasks/ are live (see backend/IMPLEMENTATION.md)
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 export async function submitTask(prompt: string): Promise<Task> {
   if (USE_MOCK) return mockSubmitTask(prompt);
