@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
 from rest_framework.renderers import JSONOpenAPIRenderer
 
-from agent_api.views import TaskViewSet, ExecutionStepViewSet, ApiDocsView
+from agent_api.views import TaskViewSet, ExecutionStepViewSet
 
 router = DefaultRouter()
 router.register(r"tasks", TaskViewSet)
@@ -24,6 +24,5 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path("openapi.json", schema_view, name="openapi-schema"),
-    path("docs/", ApiDocsView.as_view(), name="api-docs"),
     path("", include(router.urls)),
 ]

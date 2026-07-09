@@ -10,10 +10,6 @@ class HomeView(TemplateView):
     template_name = "agent_api/home.html"
 
 
-class ApiDocsView(TemplateView):
-    template_name = "agent_api/api_docs.html"
-
-
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.order_by("-created_at")
 
