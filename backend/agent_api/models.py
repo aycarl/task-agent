@@ -1,3 +1,18 @@
 from django.db import models
 
-# Create your models here.
+
+class Task(models.Model):
+    prompt = models.TextField()
+    result = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ExecutionStep(models.Model):
+    task = models.ForeignKey(Task, related_name="steps", on_delete=models.CASCADE)
+    step_number = models.PositiveIntegerField()
+    description = models.CharField(max_length=255)
+    tool_name = models.CharField(max_length=64, blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["step_number"]
