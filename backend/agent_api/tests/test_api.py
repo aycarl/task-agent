@@ -18,6 +18,8 @@ def test_create_task_returns_201_with_steps(db, client):
     assert data["result"] == "42"
     assert len(data["steps"]) == 4
     assert data["steps"][0]["tool_name"] is None
+    assert data["url"].endswith(f"/api/tasks/{data['id']}/")
+    assert data["steps"][0]["url"].startswith("http://testserver/api/steps/")
 
 
 def test_create_task_multi_step(db, client):
@@ -35,14 +37,21 @@ def test_create_task_empty_prompt_returns_400(db, client):
     """Test that creating a task with an empty prompt returns a 400 status."""
     response = client.post("/api/tasks/", {"prompt": ""}, format="json")
     assert response.status_code == 400
-    assert response.json() == {"error": "prompt is required"}
+    assert "prompt" in response.json()
+
+
+def test_create_task_whitespace_prompt_returns_400(db, client):
+    """Test that a whitespace-only prompt is rejected by the serializer's validate_prompt."""
+    response = client.post("/api/tasks/", {"prompt": "   "}, format="json")
+    assert response.status_code == 400
+    assert "prompt" in response.json()
 
 
 def test_create_task_missing_prompt_returns_400(db, client):
     """Test that creating a task without a prompt returns a 400 status."""
     response = client.post("/api/tasks/", {}, format="json")
     assert response.status_code == 400
-    assert response.json() == {"error": "prompt is required"}
+    assert "prompt" in response.json()
 
 
 def test_list_tasks_omits_steps_most_recent_first(db, client):
@@ -78,4 +87,38 @@ def test_retrieve_missing_task_returns_404(db, client):
     """Test that retrieving a non-existent task returns a 404 status."""
     response = client.get("/api/tasks/999999/")
     assert response.status_code == 404
-    assert response.json() == {"error": "not found"}
+    assert "detail" in response.json()
+
+
+def test_steps_endpoint_is_read_only_and_lists_all_steps(db, client):
+    """Test that /api/steps/ exposes every execution step and rejects writes."""
+    AgentController().run("What is 1 + 1?")
+
+    response = client.get("/api/steps/")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 4
+    assert "url" in data[0]
+
+    response = client.post("/api/steps/", {"description": "hand-crafted"}, format="json")
+    assert response.status_code == 405
+
+
+def test_update_task_prompt_via_put(db, client):
+    """Test that PUT on a task updates the writable prompt field but not agent-managed fields."""
+    task = AgentController().run("What is 1 + 1?")
+
+    response = client.put(f"/api/tasks/{task.id}/", {"prompt": "edited prompt"}, format="json")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["prompt"] == "edited prompt"
+    assert data["result"] == "2"  # result is read-only, untouched by the edit
+
+
+def test_delete_task(db, client):
+    """Test that DELETE removes a task."""
+    task = AgentController().run("What is 1 + 1?")
+
+    response = client.delete(f"/api/tasks/{task.id}/")
+    assert response.status_code == 204
+    assert client.get(f"/api/tasks/{task.id}/").status_code == 404

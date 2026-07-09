@@ -1,29 +1,36 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+from django.views.generic import TemplateView
+from rest_framework import viewsets
 
 from .agent import AgentController
-from .models import Task
-from .serializers import TaskSerializer, TaskListSerializer
+from .models import Task, ExecutionStep
+from .serializers import TaskSerializer, TaskListSerializer, ExecutionStepSerializer
 
 
-class TaskListCreateView(APIView):
-    def get(self, request):
-        tasks = Task.objects.order_by("-created_at")
-        return Response(TaskListSerializer(tasks, many=True).data)
-
-    def post(self, request):
-        prompt = request.data.get("prompt", "").strip()
-        if not prompt:
-            return Response({"error": "prompt is required"}, status=status.HTTP_400_BAD_REQUEST)
-        task = AgentController().run(prompt)
-        return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
+class HomeView(TemplateView):
+    template_name = "agent_api/home.html"
 
 
-class TaskDetailView(APIView):
-    def get(self, request, pk):
-        try:
-            task = Task.objects.get(pk=pk)
-        except Task.DoesNotExist:
-            return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(TaskSerializer(task).data)
+class ApiDocsView(TemplateView):
+    template_name = "agent_api/api_docs.html"
+
+
+class TaskViewSet(viewsets.ModelViewSet):
+    queryset = Task.objects.order_by("-created_at")
+
+    def get_serializer_class(self):
+        return TaskListSerializer if self.action == "list" else TaskSerializer
+
+    def perform_create(self, serializer):
+        # Task creation is agent-driven, not a plain model save: the prompt is routed
+        # through AgentController, which creates the Task itself and populates
+        # result/steps. So we run the agent here and swap it in as the instance,
+        # instead of letting serializer.save() persist the validated data directly.
+        task = AgentController().run(serializer.validated_data["prompt"])
+        serializer.instance = task
+
+
+class ExecutionStepViewSet(viewsets.ReadOnlyModelViewSet):
+    # Steps are only ever produced by AgentController — no client-initiated
+    # create/update/delete, so this stays read-only.
+    queryset = ExecutionStep.objects.select_related("task")
+    serializer_class = ExecutionStepSerializer

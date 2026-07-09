@@ -16,7 +16,7 @@ backend/
     ├── tools.py                # BaseTool + 3 tool implementations
     ├── agent.py                # AgentController (routing + execution loop)
     ├── serializers.py
-    ├── views.py                 # plain APIViews, no ViewSets/routers
+    ├── views.py                 # ModelViewSet + ReadOnlyModelViewSet, routed via DefaultRouter
     ├── urls.py
     └── tests/
         ├── test_tools.py
@@ -181,70 +181,80 @@ class AgentController:
 
 ## `serializers.py` / `views.py` / `urls.py`
 
-Plain `APIView`, not `ModelViewSet` + router — avoids pulling in PUT/PATCH/DELETE/pagination/filtering nobody needs, and keeps the endpoint list small and legible (3 endpoints, 3 view classes). Exact request/response fields: [`docs/api.md`](../docs/api.md).
+`HyperlinkedModelSerializer` + `ModelViewSet` behind a `DefaultRouter` — every object carries a `url` to itself, and the endpoint set follows DRF's standard viewset conventions (including `PUT`/`PATCH`/`DELETE` on tasks) rather than a hand-rolled subset. `ExecutionStep` gets its own read-only viewset (`ReadOnlyModelViewSet`) purely so its `url` field has something to resolve to — steps are still only ever produced by `AgentController`, never client-authored. Exact request/response fields: [`docs/api.md`](../docs/api.md).
+
+**Why the reversal from plain `APIView`s:** the original design avoided `ModelViewSet`/routers to keep the endpoint surface minimal (no unused verbs, no auto-pagination). That's a reasonable default, but hyperlinked, fully RESTful resources are the more idiomatic DRF shape and were requested explicitly — the trade-off (a larger verb surface on `/tasks/{id}/`, an extra `/steps/` resource) is accepted deliberately here rather than by accident.
 
 ```python
 # serializers.py
 from rest_framework import serializers
 from .models import Task, ExecutionStep
 
-class ExecutionStepSerializer(serializers.ModelSerializer):
+class ExecutionStepSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ExecutionStep
-        fields = ["step_number", "description", "tool_name", "timestamp"]
+        fields = ["url", "step_number", "description", "tool_name", "timestamp"]
 
-class TaskSerializer(serializers.ModelSerializer):
+class TaskSerializer(serializers.HyperlinkedModelSerializer):
     steps = ExecutionStepSerializer(many=True, read_only=True)
     class Meta:
         model = Task
-        fields = ["id", "prompt", "result", "created_at", "steps"]
+        fields = ["url", "id", "prompt", "result", "created_at", "steps"]
+        read_only_fields = ["result", "created_at"]
 
-class TaskListSerializer(serializers.ModelSerializer):
+    def validate_prompt(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("This field may not be blank.")
+        return value
+
+class TaskListSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Task
-        fields = ["id", "prompt", "result", "created_at"]  # no steps — keep list payload light
+        fields = ["url", "id", "prompt", "result", "created_at"]  # no steps — keep list payload light
+        read_only_fields = ["result", "created_at"]
 ```
 
 ```python
 # views.py
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Task
-from .serializers import TaskSerializer, TaskListSerializer
+from rest_framework import viewsets
+from .models import Task, ExecutionStep
+from .serializers import TaskSerializer, TaskListSerializer, ExecutionStepSerializer
 from .agent import AgentController
 
-class TaskListCreateView(APIView):
-    def get(self, request):
-        tasks = Task.objects.order_by("-created_at")
-        return Response(TaskListSerializer(tasks, many=True).data)
+class TaskViewSet(viewsets.ModelViewSet):
+    queryset = Task.objects.order_by("-created_at")
 
-    def post(self, request):
-        prompt = request.data.get("prompt", "").strip()
-        if not prompt:
-            return Response({"error": "prompt is required"}, status=status.HTTP_400_BAD_REQUEST)
-        task = AgentController().run(prompt)
-        return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
+    def get_serializer_class(self):
+        return TaskListSerializer if self.action == "list" else TaskSerializer
 
-class TaskDetailView(APIView):
-    def get(self, request, pk):
-        try:
-            task = Task.objects.get(pk=pk)
-        except Task.DoesNotExist:
-            return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(TaskSerializer(task).data)
+    def perform_create(self, serializer):
+        # Creation is agent-driven: AgentController creates the Task itself and
+        # populates result/steps, so we run it here instead of serializer.save().
+        task = AgentController().run(serializer.validated_data["prompt"])
+        serializer.instance = task
+
+class ExecutionStepViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ExecutionStep.objects.select_related("task")
+    serializer_class = ExecutionStepSerializer
 ```
 
 ```python
 # urls.py
-from django.urls import path
-from .views import TaskListCreateView, TaskDetailView
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+from .views import TaskViewSet, ExecutionStepViewSet
+
+router = DefaultRouter()
+router.register(r"tasks", TaskViewSet)
+router.register(r"steps", ExecutionStepViewSet)
 
 urlpatterns = [
-    path("tasks/", TaskListCreateView.as_view()),
-    path("tasks/<int:pk>/", TaskDetailView.as_view()),
+    path("", include(router.urls)),
 ]
 ```
+
+Router basenames are left to auto-infer (`task`, `executionstep`) rather than being passed explicitly — `HyperlinkedModelSerializer`'s default `view_name` for a field is `"{model_name}-detail"`, and `DefaultRouter.get_default_basename` derives the same `{model_name}` from `queryset.model._meta.object_name.lower()`. Passing a custom `basename` (e.g. `"step"` for `/steps/`) would desync the two and break hyperlink resolution, so the URL prefix (`steps/`) and the basename (`executionstep`) are intentionally allowed to differ.
 
 ## Tests
 
