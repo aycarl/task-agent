@@ -6,7 +6,7 @@ from agent_api.tools import (
     WeatherMockTool,
     ToolError,
 )
-from .models import Task, ExecutionStep
+from agent_api.models import Task, ExecutionStep
 
 
 class AgentController:

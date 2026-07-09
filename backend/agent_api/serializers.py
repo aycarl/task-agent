@@ -1,7 +1,7 @@
 """Serializers for the agent_api app."""
 from rest_framework import serializers
 
-from .models import Task, ExecutionStep
+from agent_api.models import Task, ExecutionStep
 
 
 class ExecutionStepSerializer(serializers.HyperlinkedModelSerializer):

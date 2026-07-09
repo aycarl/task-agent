@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Task, ExecutionStep
+from agent_api.models import Task, ExecutionStep
 
 admin.site.register(Task)
 admin.site.register(ExecutionStep)

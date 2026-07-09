@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.schemas import get_schema_view
 from rest_framework.renderers import JSONOpenAPIRenderer
 
-from .views import TaskViewSet, ExecutionStepViewSet, ApiDocsView
+from agent_api.views import TaskViewSet, ExecutionStepViewSet, ApiDocsView
 
 router = DefaultRouter()
 router.register(r"tasks", TaskViewSet)

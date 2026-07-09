@@ -1,9 +1,9 @@
 from django.views.generic import TemplateView
 from rest_framework import viewsets
 
-from .agent import AgentController
-from .models import Task, ExecutionStep
-from .serializers import TaskSerializer, TaskListSerializer, ExecutionStepSerializer
+from agent_api.agent import AgentController
+from agent_api.models import Task, ExecutionStep
+from agent_api.serializers import TaskSerializer, TaskListSerializer, ExecutionStepSerializer
 
 
 class HomeView(TemplateView):
