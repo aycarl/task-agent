@@ -2,10 +2,29 @@
 
 A task submitted through the UI is passed to an `AgentController`, which selects and runs a `Tool` (calculator, text processing, mock weather), then returns the result plus a structured execution trace. The UI shows the result, past-task history, and the step-by-step trace for any task.
 
-## Stack
+## Tech Stack and Dependencies
 
-- **Backend**: Django 6.0 + Django REST Framework (Python 3.14), SQLite for local dev — see `backend/`
-- **Frontend**: React 19 + TypeScript + Vite — see `frontend/`
+### Backend
+
+- **Frameworks**: Django 6.0 + Django REST Framework
+- **Runtime**: Python 3.14
+- **Database**: SQLite (local development)
+- **Python deps** (`backend/requirements.txt`): django-cors-headers, pytest + pytest-django, inflection, uritemplate
+
+### Frontend
+
+- **Framework/UI**: React 19
+- **Language**: TypeScript
+- **Build tool**: Vite
+- **Runtime**: Node 20+
+- **Node deps** (`frontend/package.json`): Oxlint
+
+### Docker
+
+- **Orchestration**: Docker Compose (`docker-compose.yml`)
+- **Run command**: `docker compose up`
+- **Services**: backend (`:8000`) and frontend (`:5173`)
+- **Docker runtime note**: frontend container uses Node 22
 
 ## How to run the backend
 
@@ -43,12 +62,6 @@ docker compose up
 ```
 
 Backend on `:8000` (auto-migrates, creates an `admin`/`admin1234` superuser), frontend on `:5173`.
-
-## Dependencies
-
-**Backend** (`backend/requirements.txt`): Django 6.0, Django REST Framework, django-cors-headers, pytest + pytest-django, and inflection/uritemplate for OpenAPI schema generation. Requires Python 3.14. Storage is SQLite — no database server needed.
-
-**Frontend** (`frontend/package.json`): React 19, TypeScript, Vite, Oxlint. Requires Node 20+ (the Docker setup uses Node 22).
 
 ## Assumptions and tradeoffs
 
