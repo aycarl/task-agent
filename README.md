@@ -26,7 +26,19 @@ A task submitted through the UI is passed to an `AgentController`, which selects
 - **Services**: backend (`:8000`) and frontend (`:5173`)
 - **Docker runtime note**: frontend container uses Node 22
 
-## How to run the backend
+## Running & Installation
+
+### Quick Start
+
+**One-command alternative** — run both stacks with Docker. Ensure you have the latest:
+
+```bash
+docker compose up
+```
+
+Backend on `:8000` (auto-migrates, creates an `admin`/`admin1234` superuser), frontend on `:5173`.
+
+### How to run the backend (Without Docker)
 
 ```bash
 cd backend
@@ -39,14 +51,14 @@ python manage.py runserver
 
 Runs at `http://127.0.0.1:8000/` — the homepage serves Swagger UI plus a listing of the available tools. The API lives under `/api/tasks/` (contract documented by the auto-generated OpenAPI schema at `/api/openapi.json`).
 
-Tests:
+**Tests**:
 
 ```bash
 cd backend
 pytest
 ```
 
-## How to run the frontend
+### How to run the frontend (Without Docker)
 
 ```bash
 cd frontend
@@ -55,14 +67,6 @@ npm run dev
 ```
 
 Runs at `http://localhost:5173/` and expects the backend on `http://localhost:8000` (base URL in `frontend/src/api.ts`). `npm run build` type-checks then builds; `npm run lint` runs Oxlint.
-
-**One-command alternative** — run both stacks with Docker:
-
-```bash
-docker compose up
-```
-
-Backend on `:8000` (auto-migrates, creates an `admin`/`admin1234` superuser), frontend on `:5173`.
 
 ## Assumptions and tradeoffs
 
