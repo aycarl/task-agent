@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TaskSummary } from '../types';
 import { fetchTasks } from '../api';
 
@@ -10,6 +10,7 @@ interface TaskHistoryProps {
 export default function TaskHistory({ onSelectTask, activeTaskId }: TaskHistoryProps) {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const hasShown = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -26,8 +27,14 @@ export default function TaskHistory({ onSelectTask, activeTaskId }: TaskHistoryP
   }, []);
 
   // The sidebar only earns its space once there is something to browse
-  // besides the current task.
-  if (isLoading || tasks.length <= 1) return null;
+  // besides the task already on screen: more than one task, or a lone task
+  // with nothing displayed (e.g. after a page reload). Once shown it stays
+  // for the life of this mount, so selecting that lone task doesn't
+  // collapse the sidebar under the cursor.
+  const shouldShow =
+    !isLoading && (tasks.length > 1 || (tasks.length === 1 && activeTaskId == null));
+  if (shouldShow) hasShown.current = true;
+  if (!hasShown.current) return null;
 
   return (
     <aside className="history-pane">

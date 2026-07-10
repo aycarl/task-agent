@@ -3,7 +3,7 @@
   display: flex;
   /* Sidebar renders visually left while .work-pane stays first in DOM/tab order */
   flex-direction: row-reverse;
-  justify-content: center;
+  justify-content: space-between;
   align-items: flex-start;
   gap: 40px;
   padding: 40px 40px;
@@ -177,13 +177,15 @@
   position: sticky;
   top: 24px;
   max-height: calc(100svh - 48px);
-  overflow-y: auto;
+  /* Column layout so the heading stays put and only .history-list scrolls */
+  display: flex;
+  flex-direction: column;
+  padding-block: 24px;
 
   @media (max-width: 900px) {
     position: static;
     width: auto;
     max-height: none;
-    overflow: visible;
     border-top: 1px solid var(--border);
     padding-top: 24px;
   }
@@ -191,11 +193,30 @@
 
 .history-list {
   list-style: none;
-  padding: 0;
+  padding: 0 4px 0 0;
   margin: 12px 0 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--text);
+  }
 }
 
 .history-item {
