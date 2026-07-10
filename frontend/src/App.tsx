@@ -35,7 +35,16 @@ function App() {
       </header>
 
       <TaskInput onSubmit={handleSubmit} disabled={isSubmitting} />
-      {error && <p className="error-banner">{error}</p>}
+      {error && (
+        <p className="error-banner" role="alert">
+          {error}
+        </p>
+      )}
+
+      {/* Always-mounted live region so screen readers hear results land */}
+      <p className="sr-only" role="status">
+        {activeTask ? `Task finished. Result: ${activeTask.result}` : ''}
+      </p>
 
       {activeTask && (
         <section className="result-section">

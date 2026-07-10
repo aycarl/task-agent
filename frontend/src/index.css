@@ -2,8 +2,11 @@
   --bg: #f7f5f0;
   --surface: #fffdf8;
   --border: #e3ded2;
+  /* Form-control boundaries need >= 3:1 against adjacent colors (WCAG 1.4.11) */
+  --border-strong: #8f887a;
   --code-bg: #eee9dd;
-  --text: #7c766a;
+  /* Muted text must hold >= 4.5:1 on both --bg and --surface (WCAG 1.4.3) */
+  --text: #6c665b;
   --text-h: #211f1a;
   --accent: #2743c8;
   --accent-bg: rgba(39, 67, 200, 0.07);
@@ -30,6 +33,7 @@
     --bg: #16140f;
     --surface: #1e1b15;
     --border: #37322a;
+    --border-strong: #6f6858;
     --code-bg: #282318;
     --text: #9c9585;
     --text-h: #ece7db;
@@ -80,6 +84,19 @@ h2 {
 
 p {
   margin: 0;
+}
+
+/* Visually hidden, still read by screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 code {

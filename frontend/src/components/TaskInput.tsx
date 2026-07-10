@@ -34,7 +34,7 @@ export default function TaskInput({ onSubmit, disabled }: TaskInputProps) {
 
   return (
     <div className="task-entry">
-      <div className="tool-chips" aria-label="Available tools">
+      <div className="tool-chips" role="group" aria-label="Available tools">
         <span className="tool-chips-label">Tools</span>
         {TOOLS.map((tool) => (
           <button
