@@ -62,6 +62,19 @@ def test_text_processor_reverse():
     assert TextProcessorTool().run("reverse 'hello world'") == "dlrow olleh"
 
 
+def test_text_processor_preserves_content_containing_filler_substrings():
+    """A content word like 'Tokyo' must survive even though it contains 'to'."""
+    assert TextProcessorTool().run("convert 'Tokyo' to uppercase") == "TOKYO"
+
+
+def test_text_processor_recognizes_alternate_instruction_phrasings():
+    """Test that common alternate phrasings (make/set/transform/turn, 'upper case') work."""
+    assert TextProcessorTool().run("make 'hello world' upper case") == "HELLO WORLD"
+    assert TextProcessorTool().run("set 'HELLO' to lower case") == "hello"
+    assert TextProcessorTool().run("transform 'hello' to uppercase") == "HELLO"
+    assert TextProcessorTool().run("turn 'hello' into lowercase") == "hello"
+
+
 def test_weather_known_city():
     """Test fetching weather for a known city."""
     assert "Toronto" in WeatherMockTool().run("weather in Toronto")

@@ -71,7 +71,7 @@ Runs at `http://localhost:5173/` and expects the backend on `http://localhost:80
 ## Assumptions and tradeoffs
 
 - **The agent is a rule-based router, not a real LLM call.** Every tool is deterministic (given the system clock — none calls an external API), so a live LLM would add an API key, latency, and non-determinism for no benefit at this scale. Tool selection sits behind a swappable interface (`backend/agent_api/agent.py`), so an LLM router could replace it without touching callers.
-- **Multi-step prompts are handled by splitting on `" and "`** and running each part through the same router — it demonstrates chaining tools without pretending to be a planner.
+- **Multi-step prompts are handled by splitting the prompt on `" then "` into ordered stages, and each stage on `" and "` into parallel sub-prompts.** `" and "` sub-prompts run independently and their outputs are joined; `" then "` stages run sequentially, with each stage's joined output piped into the next stage's input before routing — so `"calculate 3 + 5 then convert to uppercase"` really does chain `CalculatorTool`'s output into `TextProcessorTool`. This is orchestration-level chaining in `AgentController`, not a real planner, and `BaseTool` stays untouched.
 - **No auth/RBAC, no real-time streaming, no tool plugin registry** — deliberately cut as scope creep for three tools and three endpoints.
 - **Dev-only settings**: SQLite, `DEBUG = True`, a checked-in `SECRET_KEY`. Nothing here is production-safe as-is.
 - **The frontend hardcodes the backend URL** and relies on CORS (`django-cors-headers`) rather than a Vite dev proxy — one less moving part for local dev.
@@ -93,7 +93,7 @@ Explicitly out of scope:
 ## What I'd improve with more time
 
 - Swap the rule-based router for real LLM tool selection at the existing `select_tool` seam.
-- A real planning loop for multi-step prompts instead of `" and "` splitting.
+- An explicit `{result}` placeholder syntax for chained (`" then "`) prompts — today the previous stage's output is auto-injected by prepending it to the next stage's text; a placeholder would let the user control exactly where it lands.
 - A frontend test runner (Vitest) with component tests — currently only the backend has tests.
 - Streaming trace updates (SSE) so the execution trace renders live instead of after completion.
 - Production-ready settings driven by environment variables (secret key, debug, allowed hosts, CORS origins).

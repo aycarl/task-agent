@@ -76,24 +76,49 @@ class AgentController:
 
         log(f'Received input "{prompt}"')
 
-        sub_prompts = [p.strip() for p in prompt.split(" and ") if p.strip()]
-        outputs = []
-        for sub in sub_prompts:
-            tool = self._select_tool(sub)
-            if tool is None:
-                log(f'No matching tool for: "{sub}"')
-                outputs.append(f"(Unavailable tool: {sub})")
-                continue
-            log(f"Selected tool: {tool.name}", tool_name=tool.name)
-            try:
-                result = tool.run(sub)
-                log(f"Tool result: {result}", tool_name=tool.name)
-                outputs.append(result)
-            except ToolError as e:
-                log(f"Tool error: {e}", tool_name=tool.name)
-                outputs.append(f"(error: {e})")
+        # " then " splits the prompt into sequential stages, where each
+        # stage's result is piped into the next stage's input. " and "
+        # (within a stage) stays parallel/independent, as before.
+        stages = [s.strip() for s in prompt.split(" then ") if s.strip()]
+        previous_result: str | None = None
+        stage_outputs = []
+        chain_broken = False
 
-        final_result = " | ".join(outputs)
+        for stage in stages:
+            if chain_broken:
+                log(f'Skipped "{stage}" — previous step failed')
+                continue
+
+            if previous_result is not None:
+                log(f'Piping result "{previous_result}" into next step')
+                stage = f"{previous_result} {stage}"
+
+            sub_prompts = [p.strip() for p in stage.split(" and ") if p.strip()]
+            outputs = []
+            stage_failed = False
+            for sub in sub_prompts:
+                tool = self._select_tool(sub)
+                if tool is None:
+                    log(f'No matching tool for: "{sub}"')
+                    outputs.append(f"(Unavailable tool: {sub})")
+                    stage_failed = True
+                    continue
+                log(f"Selected tool: {tool.name}", tool_name=tool.name)
+                try:
+                    result = tool.run(sub)
+                    log(f"Tool result: {result}", tool_name=tool.name)
+                    outputs.append(result)
+                except ToolError as e:
+                    log(f"Tool error: {e}", tool_name=tool.name)
+                    outputs.append(f"(error: {e})")
+                    stage_failed = True
+
+            stage_result = " | ".join(outputs)
+            stage_outputs.append(stage_result)
+            previous_result = stage_result
+            chain_broken = stage_failed
+
+        final_result = stage_outputs[-1] if stage_outputs else ""
         log("Returning result to user")
 
         task.result = final_result
