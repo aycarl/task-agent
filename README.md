@@ -76,19 +76,9 @@ Runs at `http://localhost:5173/` and expects the backend on `http://localhost:80
 - **Dev-only settings**: SQLite, `DEBUG = True`, a checked-in `SECRET_KEY`. Nothing here is production-safe as-is.
 - **The frontend hardcodes the backend URL** and relies on CORS (`django-cors-headers`) rather than a Vite dev proxy — one less moving part for local dev.
 
-Explicitly out of scope:
-
-| Feature | Reason skipped |
-|---|---|
-| Real LLM call for intent parsing | Tools here are deterministic by design; a live call adds an API key/latency/non-determinism for no real benefit |
-| Real-time streaming (SSE/WS) | High implementation risk for a feature that only needs post-hoc clarity |
-| RBAC / auth | No login/auth requirement in scope — inventing one would be pure scope creep |
-| Dynamic tool plugin/registry system | Five tools; a list is sufficient, a plugin system solves a problem that doesn't exist yet |
-| Retry-with-backoff in the agent | Tools are pure functions with no transient failure modes to retry against; errors are caught and logged as a trace step instead |
-
 ## Time spent
 
-~6–8 hours over one day.
+~12 hours over two day.
 
 ## What I'd improve with more time
 
