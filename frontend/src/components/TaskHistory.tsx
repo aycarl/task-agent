@@ -25,27 +25,27 @@ export default function TaskHistory({ onSelectTask, activeTaskId }: TaskHistoryP
     };
   }, []);
 
+  // The sidebar only earns its space once there is something to browse
+  // besides the current task.
+  if (isLoading || tasks.length <= 1) return null;
+
   return (
-    <section className="task-history">
+    <aside className="history-pane">
       <h2>History</h2>
-      {isLoading && <p className="history-empty">Loading…</p>}
-      {!isLoading && tasks.length === 0 && <p className="history-empty">No tasks yet.</p>}
-      {tasks.length > 0 && (
-        <ul className="history-list">
-          {tasks.map((task) => (
-            <li key={task.id}>
-              <button
-                type="button"
-                className={task.id === activeTaskId ? 'history-item active' : 'history-item'}
-                onClick={() => onSelectTask(task.id)}
-              >
-                <span className="history-prompt">{task.prompt}</span>
-                <span className="history-result">{task.result}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+      <ul className="history-list">
+        {tasks.map((task) => (
+          <li key={task.id}>
+            <button
+              type="button"
+              className={task.id === activeTaskId ? 'history-item active' : 'history-item'}
+              onClick={() => onSelectTask(task.id)}
+            >
+              <span className="history-prompt">{task.prompt}</span>
+              <span className="history-result">{task.result}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </aside>
   );
 }

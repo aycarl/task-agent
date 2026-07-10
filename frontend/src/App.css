@@ -1,13 +1,33 @@
 .page {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 32px;
-  padding: 40px 32px 56px;
+  /* Sidebar renders visually left while .work-pane stays first in DOM/tab order */
+  flex-direction: row-reverse;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  padding: 40px 40px;
   box-sizing: border-box;
+
+  @media (max-width: 900px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
   @media (max-width: 640px) {
     padding: 24px 20px 40px;
+  }
+}
+
+.work-pane {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+
+  @media (max-width: 640px) {
     gap: 24px;
   }
 }
@@ -149,12 +169,24 @@
   color: var(--text-h);
 }
 
-/* Task history */
+/* Task history (sidebar; only rendered when there is more than one task) */
 
-.task-history {
-  margin-top: 8px;
-  border-top: 1px solid var(--border);
-  padding-top: 24px;
+.history-pane {
+  width: 280px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 24px;
+  max-height: calc(100svh - 48px);
+  overflow-y: auto;
+
+  @media (max-width: 900px) {
+    position: static;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+  }
 }
 
 .history-list {
@@ -169,9 +201,9 @@
 .history-item {
   width: 100%;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -198,7 +230,7 @@
 }
 
 .history-prompt {
-  flex: 1;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -208,10 +240,8 @@
   color: var(--text);
   font-family: var(--mono);
   font-size: 13px;
-  flex-shrink: 0;
-}
-
-.history-empty {
-  color: var(--text);
-  font-size: 15px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

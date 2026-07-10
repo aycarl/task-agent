@@ -38,20 +38,22 @@ function App() {
 
   return (
     <main className="page">
-      <header className="page-header">
-        <h1>Task Agent</h1>
-        <p>Give the agent a task. It picks a tool, runs it, and shows every step.</p>
-      </header>
+      <div className="work-pane">
+        <header className="page-header">
+          <h1>Task Agent</h1>
+          <p>Give the agent a task. It picks a tool, runs it, and shows every step.</p>
+        </header>
 
-      <TaskInput onSubmit={handleSubmit} disabled={isSubmitting} />
-      {error && <p className="error-banner">{error}</p>}
+        <TaskInput onSubmit={handleSubmit} disabled={isSubmitting} />
+        {error && <p className="error-banner">{error}</p>}
 
-      {activeTask && (
-        <section className="result-section">
-          <ResultPanel task={activeTask} />
-          <ExecutionTrace steps={activeTask.steps} />
-        </section>
-      )}
+        {activeTask && (
+          <section className="result-section">
+            <ResultPanel task={activeTask} />
+            <ExecutionTrace steps={activeTask.steps} />
+          </section>
+        )}
+      </div>
 
       <TaskHistory key={historyVersion} onSelectTask={handleSelectTask} activeTaskId={activeTask?.id} />
     </main>
