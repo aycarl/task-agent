@@ -2,7 +2,8 @@ import type { ExecutionStep, Task, TaskSummary } from './types';
 
 const BASE_URL = 'http://localhost:8000/api';
 
-// TODO: remove mock layer once POST/GET /api/tasks/ are live (see backend/IMPLEMENTATION.md)
+// Dormant mock backend kept for backend-less UI demos — flip to true to use it,
+// or delete the mock section below if it's no longer wanted.
 const USE_MOCK = false;
 
 export async function submitTask(prompt: string): Promise<Task> {
@@ -57,8 +58,8 @@ const mockTasks: Task[] = [
   makeTask(1, 'What is 15 + 27?', '2026-07-09T09:00:00Z', 'CalculatorTool', '42'),
 ];
 
-// Whitelist-only expression, same safety argument as the real CalculatorTool
-// (backend/IMPLEMENTATION.md): only digits/operators/parens ever reach evaluation.
+// Whitelist-only expression, mirroring the real CalculatorTool's guard
+// (backend/agent_api/tools.py): only digits/operators/parens ever reach evaluation.
 const CALC_EXPR = /^[\d.\s+\-*/()]+$/;
 
 function runCalculator(prompt: string): string | null {

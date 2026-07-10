@@ -1,0 +1,76 @@
+# Backend — implementation guide
+
+Django 6 + Django REST Framework, SQLite. A single app, `agent_api`, exposes a three-endpoint task API: submit a natural-language prompt, and a rule-based agent picks a tool, runs it, and persists a step-by-step execution trace alongside the result.
+
+Request/response shapes live in [`docs/api.md`](../docs/api.md) (single source of truth). 
+Setup/run commands: [`docs/setup.md`](../docs/setup.md). 
+Project-scope decisions: [`docs/architecture.md`](../docs/architecture.md).
+
+## Request lifecycle
+
+`POST /api/tasks/ {"prompt": ...}` flows through:
+
+1. **`TaskViewSet.create`** (`agent_api/views.py`) — DRF validates via `TaskSerializer` (`validate_prompt` strips whitespace and rejects blank prompts with a 400).
+2. **`perform_create`** — instead of letting `serializer.save()` persist the validated data, it runs `AgentController().run(prompt)` and swaps the returned task in as `serializer.instance`. Task creation is agent-driven: the agent creates the `Task` row itself and populates `result`/`steps`.
+3. **`AgentController.run`** (`agent_api/agent.py`) — creates the `Task`, logs `Received input`, splits the prompt on `" and "` into sub-prompts, and for each one:
+   - `_select_tool` walks an ordered tool list; the first tool whose `can_handle(sub_prompt)` returns `True` wins (`None` if nothing matches).
+   - Logs `Selected tool: <name>`, runs the tool, logs `Tool result: <output>`.
+   - A `ToolError` is caught and logged as a `Tool error: …` step, contributing `(error: …)` to the output; an unmatched sub-prompt logs `No matching tool` and contributes `(unhandled: …)`. A bad prompt never produces a 500.
+4. Sub-prompt outputs are joined with `" | "` into `Task.result`, a final `Returning result to user` step is logged, and the serializer returns the task with its nested, `step_number`-ordered `steps`.
+
+Every `log(...)` call in the loop persists an `ExecutionStep` row immediately, so the trace is a faithful, timestamped record of what the agent did.
+
+## The tools
+
+### `CalculatorTool`
+Extracts an arithmetic expression by stripping every character outside a whitelist (digits, `.`, whitespace, `+-*/()`), then requires the remainder to fully match the whitelist regex and contain at least one digit and one operator. 
+
+Evaluation is a recursive walk of the `ast.parse` tree (`_eval_node`) that only accepts `BinOp` (+ − × ÷), `UnaryOp` (±), and numeric `Constant` nodes — there is no `eval`, so nothing outside plain arithmetic can execute. 
+
+Division by zero and malformed expressions raise `ToolError`; whole-number results render without a trailing `.0`.
+
+
+### `TextProcessorTool`
+Matches on `uppercase` / `lowercase` / `word count` keywords, strips the instruction words from the prompt, and applies the operation to what remains.
+
+### `WeatherMockTool`
+Matches on `weather`; returns canned data for Toronto/Vancouver/Montreal and a default response for any other city. No external API.
+
+### `DaysSinceTool`
+Matches on `days since` / `days until`; finds a date in the prompt (ISO `2024-01-15` or written-out `December 25, 2026`), parses it with `strptime`, and reports the day count against today (future dates phrase as "days until"). 
+
+No parseable date → `ToolError`.
+
+### `CityTimeTool`
+Matches on `time in` / `current time`; maps a known city (Toronto, Vancouver, Montreal, London, Tokyo) to its IANA zone via the stdlib `zoneinfo` and reports the current `HH:MM (zone)`; unknown cities fall back to UTC. `tzdata` is pinned in `requirements.txt` so this also works in the slim Docker image.
+
+## Adding a tool
+
+1. Subclass `BaseTool` in `agent_api/tools.py`: set `name`, implement `can_handle(prompt)` (cheap keyword/regex check) and `run(prompt)` (return plain text; raise `ToolError` on bad input).
+2. Append an instance to `self.tools` in `AgentController.__init__` (`agent_api/agent.py`). **Order matters** — the first `can_handle` match wins, so put more specific tools before broader ones. Live example: `DaysSinceTool` sits ahead of `CalculatorTool` because a bare date like `2024-01-15` parses as arithmetic (`2024 − 01 − 15 = 2008`); `test_agent.py` pins that routing.
+3. Add cases to `tests/test_tools.py` (tool behaviour) and, if routing could be ambiguous, `tests/test_agent.py` (selection).
+
+Nothing else changes: the API layer, serializers, and trace format are tool-agnostic.
+
+## Tests
+
+Tests can be run while the Backend Docker container is running with the following command:
+
+```bash
+docker compose exec backend pytest
+```
+
+pytest + pytest-django (`pytest.ini` sets `DJANGO_SETTINGS_MODULE`); the fixture-based tests require `pytest`, not Django's `manage.py test` runner.
+
+```bash
+cd backend
+source .venv/bin/activate
+pytest   # whole suite
+pytest agent_api/tests/test_api.py::test_create_task_returns_201_with_steps   # single test
+```
+
+| File | Covers |
+|---|---|
+| `tests/test_tools.py` | Each tool directly: calculator arithmetic incl. parentheses, division-by-zero and malformed input raising `ToolError`; text upper/lower/word-count; weather known city + unknown-city default; days-since ISO and written-month dates, future dates, unparseable dates; city time reply shape + UTC fallback. |
+| `tests/test_agent.py` | The controller: trace shape for a single-tool run, multi-tool chaining via `" and "`, the no-matching-tool path, the DaysSince-before-Calculator routing order, and a three-tool chain. |
+| `tests/test_api.py` | The HTTP layer with `APIClient`: 201 with trace, multi-step create, 400 on empty/whitespace/missing prompt, list ordering without `steps`, retrieve with `steps`, 404, 405 on write verbs, and absence of `/api/steps/`. |

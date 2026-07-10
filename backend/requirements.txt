@@ -5,3 +5,4 @@ pytest-django==4.11.1
 django-cors-headers==4.9.0
 inflection==0.5.1
 uritemplate==4.2.0
+tzdata==2026.2

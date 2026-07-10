@@ -2,6 +2,8 @@
 from agent_api.tools import (
     BaseTool,
     CalculatorTool,
+    CityTimeTool,
+    DaysSinceTool,
     TextProcessorTool,
     WeatherMockTool,
     ToolError,
@@ -17,10 +19,15 @@ class AgentController:
     """
 
     def __init__(self):
+        # Ordered: first can_handle match wins. DaysSinceTool must precede
+        # CalculatorTool — a bare date like 2024-01-15 parses as arithmetic
+        # (2024 - 01 - 15), so the calculator would steal date prompts.
         self.tools: list[BaseTool] = [
+            DaysSinceTool(),
             CalculatorTool(),
             TextProcessorTool(),
             WeatherMockTool(),
+            CityTimeTool(),
         ]
 
     def _select_tool(self, sub_prompt: str) -> BaseTool | None:
@@ -75,7 +82,7 @@ class AgentController:
             tool = self._select_tool(sub)
             if tool is None:
                 log(f'No matching tool for: "{sub}"')
-                outputs.append(f"(unhandled: {sub})")
+                outputs.append(f"(Unavailable tool: {sub})")
                 continue
             log(f"Selected tool: {tool.name}", tool_name=tool.name)
             try:
