@@ -30,7 +30,7 @@ A task submitted through the UI is passed to an `AgentController`, which selects
 
 ### Quick Start
 
-**One-command alternative** — run both stacks with Docker. Ensure you have the latest:
+**One-command** — run both stacks with Docker. Ensure you have the latest:
 
 ```bash
 docker compose up
