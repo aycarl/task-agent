@@ -9,11 +9,12 @@ Django 6 + Django REST Framework, SQLite. A single app, `agent_api`, exposes a t
 1. **`TaskViewSet.create`** (`agent_api/views.py`) 
    — DRF validates via `TaskSerializer` (`validate_prompt` strips whitespace and rejects blank prompts with a 400).
 2. **`perform_create`** — instead of letting `serializer.save()` persist the validated data, it runs `AgentController().run(prompt)` and swaps the returned task in as `serializer.instance`. Task creation is agent-driven: the agent creates the `Task` row itself and populates `result`/`steps`.
-3. **`AgentController.run`** (`agent_api/agent.py`) — creates the `Task`, logs `Received input`, splits the prompt on `" and "` into sub-prompts, and for each one:
+3. **`AgentController.run`** (`agent_api/agent.py`) — creates the `Task`, logs `Received input`, then splits the prompt on `" then "` into ordered **stages** (sequential — one stage's result feeds the next) and, within each stage, on `" and "` into sub-prompts (parallel — independent of each other). For each sub-prompt:
    - `_select_tool` walks an ordered tool list; the first tool whose `can_handle(sub_prompt)` returns `True` wins (`None` if nothing matches).
    - Logs `Selected tool: <name>`, runs the tool, logs `Tool result: <output>`.
-   - A `ToolError` is caught and logged as a `Tool error: …` step, contributing `(error: …)` to the output; an unmatched sub-prompt logs `No matching tool` and contributes `(unhandled: …)`. A bad prompt never produces a 500.
-4. Sub-prompt outputs are joined with `" | "` into `Task.result`, a final `Returning result to user` step is logged, and the serializer returns the task with its nested, `step_number`-ordered `steps`.
+   - A `ToolError` is caught and logged as a `Tool error: …` step, contributing `(error: …)` to the output; an unmatched sub-prompt logs `No matching tool` and contributes `(Unavailable tool: …)`. A bad prompt never produces a 500.
+   - Before stage *N* (N > 0) runs, its previous stage's joined output is logged (`Piping result "…" into next step`) and prepended to the stage's text, so the next tool sees it as part of its input. If a stage fails (a `ToolError` or an unmatched sub-prompt), the chain stops — later stages are logged as `Skipped "…" — previous step failed` rather than fed corrupted input. `BaseTool`/tool implementations are unaware of any of this; chaining is purely an `AgentController` orchestration concern.
+4. Each stage's sub-prompt outputs are joined with `" | "`; `Task.result` is the **last** stage's joined output (for prompts with no `" then "` this is identical to the old single-stage behavior). A final `Returning result to user` step is logged, and the serializer returns the task with its nested, `step_number`-ordered `steps`.
 
 Every `log(...)` call in the loop persists an `ExecutionStep` row immediately, so the trace is a faithful, timestamped record of what the agent did.
 
@@ -71,5 +72,5 @@ pytest agent_api/tests/test_api.py::test_create_task_returns_201_with_steps   # 
 | File | Covers |
 |---|---|
 | `tests/test_tools.py` | Each tool directly: calculator arithmetic incl. parentheses, division-by-zero and malformed input raising `ToolError`; text upper/lower/word-count; weather known city + unknown-city default; days-since ISO and written-month dates, future dates, unparseable dates; city time reply shape + UTC fallback. |
-| `tests/test_agent.py` | The controller: trace shape for a single-tool run, multi-tool chaining via `" and "`, the no-matching-tool path, the DaysSince-before-Calculator routing order, and a three-tool chain. |
+| `tests/test_agent.py` | The controller: trace shape for a single-tool run, parallel multi-tool runs via `" and "`, the no-matching-tool path, the DaysSince-before-Calculator routing order, a three-tool parallel run, sequential chaining via `" then "` (result piped into the next stage), and a chain stopping after a failed stage. |
 | `tests/test_api.py` | The HTTP layer with `APIClient`: 201 with trace, multi-step create, 400 on empty/whitespace/missing prompt, list ordering without `steps`, retrieve with `steps`, 404, 405 on write verbs, and absence of `/api/steps/`. |

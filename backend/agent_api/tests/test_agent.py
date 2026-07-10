@@ -43,3 +43,34 @@ def test_multi_step_chains_three_tools(db):
     assert "DaysSinceTool" in tool_names
     assert "CityTimeTool" in tool_names
     assert "CalculatorTool" in tool_names
+
+
+def test_chained_stage_receives_previous_result(db):
+    """Test that ' then ' pipes one stage's result into the next stage's input."""
+    task = AgentController().run("calculate 3 + 5 then convert to uppercase")
+    descriptions = [s.description for s in task.steps.all()]
+    tool_names = [s.tool_name for s in task.steps.all() if s.tool_name]
+    assert "CalculatorTool" in tool_names
+    assert "TextProcessorTool" in tool_names
+    assert any("Piping result" in d for d in descriptions)
+    assert task.result == "8"
+
+
+def test_chain_stops_after_tool_error(db):
+    """Test that a failed stage breaks the chain instead of piping garbage forward."""
+    task = AgentController().run("5 / 0 then convert to uppercase")
+    descriptions = [s.description for s in task.steps.all()]
+    tool_names = [s.tool_name for s in task.steps.all() if s.tool_name]
+    assert "TextProcessorTool" not in tool_names
+    assert any("Skipped" in d for d in descriptions)
+    assert "error" in task.result
+
+
+def test_chained_parallel_result_preserves_city_names_when_uppercased(db):
+    """Regression: a piped-in multi-part result must not get mangled by the
+    TextProcessorTool's filler-word stripping (e.g. 'Tokyo' losing its 'To')."""
+    task = AgentController().run(
+        "time in tokyo and weather in tokyo and 45 + 90 then uppercase"
+    )
+    assert task.result.startswith("TOKYO:")
+    assert "135" in task.result

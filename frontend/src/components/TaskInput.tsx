@@ -9,7 +9,7 @@ interface TaskInputProps {
 // One chip per tool, each carrying a phrasing the router is known to match.
 const TOOLS = [
   { name: 'calculator', example: '12 * (3 + 4)' },
-  { name: 'text', example: "reverse 'hello world'" },
+  { name: 'text', example: "'hello world' in uppercase" },
   { name: 'weather', example: 'weather in toronto' },
   { name: 'days since', example: 'days since 2024-01-15' },
   { name: 'city time', example: 'time in tokyo' },

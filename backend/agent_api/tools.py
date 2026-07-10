@@ -101,23 +101,37 @@ class TextProcessorTool(BaseTool):
 
     name = "TextProcessorTool"
 
+    # Instruction/filler words stripped out when extracting the operand text.
+    # \b-bounded so a word is only removed as a whole word — without this,
+    # a bare "to" would also delete itself out of content like "Tokyo".
+    _STRIP_RE = re.compile(
+        r"\b("
+        r"convert|transform|set|make|turn|change|please|into|to|of|"
+        r"upper case|uppercase|lower case|lowercase|word count|reverse"
+        r")\b",
+        re.I,
+    )
+
     def can_handle(self, prompt: str) -> bool:
+        lower = prompt.lower()
         return any(
-            k in prompt.lower()
-            for k in ["uppercase", "lowercase", "word count", "reverse"]
+            k in lower
+            for k in [
+                "uppercase",
+                "upper case",
+                "lowercase",
+                "lower case",
+                "word count",
+                "reverse",
+            ]
         )
 
     def run(self, prompt: str) -> str:
         lower = prompt.lower()
-        text = re.sub(
-            r"(convert|to|uppercase|lowercase|word count|reverse|of)",
-            "",
-            lower,
-            flags=re.I,
-        ).strip(" '\"")
-        if "uppercase" in lower:
+        text = self._STRIP_RE.sub("", lower).strip(" '\"")
+        if "uppercase" in lower or "upper case" in lower:
             return text.upper()
-        if "lowercase" in lower:
+        if "lowercase" in lower or "lower case" in lower:
             return text.lower()
         if "word count" in lower:
             return str(len(text.split()))
@@ -179,9 +193,9 @@ class DaysSinceTool(BaseTool):
         if parsed is None:
             raise ToolError(f"Could not parse a date from: {prompt!r}")
         delta = (date.today() - parsed).days
-        if delta >= 0:
-            return f"{delta} days since {parsed.isoformat()}"
-        return f"{-delta} days until {parsed.isoformat()}"
+        if "days until" in prompt.lower():
+            delta = -delta
+        return str(delta)
 
 
 class CityTimeTool(BaseTool):
