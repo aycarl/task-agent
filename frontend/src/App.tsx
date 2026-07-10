@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Task } from './types';
-import { fetchTask, submitTask } from './api';
+import { submitTask } from './api';
 import TaskInput from './components/TaskInput';
 import ResultPanel from './components/ResultPanel';
 import ExecutionTrace from './components/ExecutionTrace';
@@ -27,35 +27,24 @@ function App() {
     }
   }
 
-  async function handleSelectTask(id: number) {
-    setError(null);
-    try {
-      setActiveTask(await fetchTask(id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
-    }
-  }
-
   return (
     <main className="page">
-      <div className="work-pane">
-        <header className="page-header">
-          <h1>Task Agent</h1>
-          <p>Give the agent a task. It picks a tool, runs it, and shows every step.</p>
-        </header>
+      <header className="page-header">
+        <h1>Task Agent</h1>
+        <p>Give the agent a task. It picks a tool, runs it, and shows every step.</p>
+      </header>
 
-        <TaskInput onSubmit={handleSubmit} disabled={isSubmitting} />
-        {error && <p className="error-banner">{error}</p>}
+      <TaskInput onSubmit={handleSubmit} disabled={isSubmitting} />
+      {error && <p className="error-banner">{error}</p>}
 
-        {activeTask && (
-          <section className="result-section">
-            <ResultPanel task={activeTask} />
-            <ExecutionTrace steps={activeTask.steps} />
-          </section>
-        )}
-      </div>
+      {activeTask && (
+        <section className="result-section">
+          <ResultPanel task={activeTask} />
+          <ExecutionTrace steps={activeTask.steps} />
+        </section>
+      )}
 
-      <TaskHistory key={historyVersion} onSelectTask={handleSelectTask} activeTaskId={activeTask?.id} />
+      <TaskHistory key={historyVersion} excludeTaskId={activeTask?.id} />
     </main>
   );
 }

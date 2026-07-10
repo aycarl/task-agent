@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import type { TaskSummary } from '../types';
-import { fetchTasks } from '../api';
+import { useEffect, useState } from 'react';
+import type { ExecutionStep, TaskSummary } from '../types';
+import { fetchTask, fetchTasks } from '../api';
+import ExecutionTrace from './ExecutionTrace';
 
 interface TaskHistoryProps {
-  onSelectTask: (id: number) => void;
-  activeTaskId?: number | null;
+  excludeTaskId?: number | null;
 }
 
-export default function TaskHistory({ onSelectTask, activeTaskId }: TaskHistoryProps) {
+export default function TaskHistory({ excludeTaskId }: TaskHistoryProps) {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const hasShown = useRef(false);
+  const [openId, setOpenId] = useState<number | null>(null);
+  // Traces are fetched lazily on first expand and cached; 'failed' allows a
+  // retry on the next expand instead of caching the error.
+  const [traces, setTraces] = useState<Record<number, ExecutionStep[] | 'failed'>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -26,33 +29,55 @@ export default function TaskHistory({ onSelectTask, activeTaskId }: TaskHistoryP
     };
   }, []);
 
-  // The sidebar only earns its space once there is something to browse
-  // besides the task already on screen: more than one task, or a lone task
-  // with nothing displayed (e.g. after a page reload). Once shown it stays
-  // for the life of this mount, so selecting that lone task doesn't
-  // collapse the sidebar under the cursor.
-  const shouldShow =
-    !isLoading && (tasks.length > 1 || (tasks.length === 1 && activeTaskId == null));
-  if (shouldShow) hasShown.current = true;
-  if (!hasShown.current) return null;
+  const rows = tasks.filter((task) => task.id !== excludeTaskId);
+  if (isLoading || rows.length === 0) return null;
+
+  function toggle(id: number) {
+    if (openId === id) {
+      setOpenId(null);
+      return;
+    }
+    setOpenId(id);
+    if (Array.isArray(traces[id])) return;
+    fetchTask(id)
+      .then((task) => setTraces((prev) => ({ ...prev, [id]: task.steps ?? [] })))
+      .catch(() => setTraces((prev) => ({ ...prev, [id]: 'failed' })));
+  }
 
   return (
-    <aside className="history-pane">
-      <h2>History</h2>
+    <section className="task-history">
+      <h2>{excludeTaskId != null ? 'Earlier' : 'History'}</h2>
       <ul className="history-list">
-        {tasks.map((task) => (
-          <li key={task.id}>
-            <button
-              type="button"
-              className={task.id === activeTaskId ? 'history-item active' : 'history-item'}
-              onClick={() => onSelectTask(task.id)}
-            >
-              <span className="history-prompt">{task.prompt}</span>
-              <span className="history-result">{task.result}</span>
-            </button>
-          </li>
-        ))}
+        {rows.map((task) => {
+          const isOpen = task.id === openId;
+          const trace = traces[task.id];
+          return (
+            <li key={task.id} className={isOpen ? 'history-row open' : 'history-row'}>
+              <button
+                type="button"
+                className="history-toggle"
+                aria-expanded={isOpen}
+                onClick={() => toggle(task.id)}
+              >
+                <span className="history-chevron" aria-hidden="true">
+                  ▶
+                </span>
+                <span className="history-prompt">{task.prompt}</span>
+                <span className="history-result">{task.result}</span>
+              </button>
+              {isOpen && (
+                <div className="history-fold">
+                  {trace === undefined && <p className="history-status">Loading…</p>}
+                  {trace === 'failed' && (
+                    <p className="history-status">Couldn't load the trace. Click to retry.</p>
+                  )}
+                  {Array.isArray(trace) && <ExecutionTrace steps={trace} />}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
-    </aside>
+    </section>
   );
 }

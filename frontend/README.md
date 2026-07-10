@@ -1,6 +1,6 @@
 # Frontend — implementation guide
 
-React 19 + TypeScript + Vite. Four focused components wired from `App.tsx` with plain `useState`/`useEffect` — no state library, no router, deliberately not a chat UI. The flow is: submit a task → see the result and its execution trace → click a past task in the history sidebar to inspect its trace. The layout is two-pane: input/result/trace in the main column, history in a sticky sidebar that only renders once there is something to browse besides the on-screen task (below 900px it stacks under the main column).
+React 19 + TypeScript + Vite. Four focused components wired from `App.tsx` with plain `useState`/`useEffect` — no state library, no router, deliberately not a chat UI. The flow is: submit a task → see the result and its execution trace featured at the top → expand any earlier run in place to inspect its trace. The layout is a single centered column that never changes shape — there is no sidebar and no conditional macro-layout.
 
 The API contract this consumes is documented by the backend's auto-generated OpenAPI schema (`/api/openapi.json`, rendered by Swagger UI at `/`); the server side is documented in [`backend/README.md`](../backend/README.md).
 
@@ -8,7 +8,7 @@ The API contract this consumes is documented by the backend's auto-generated Ope
 
 1. **`TaskInput`** (controlled form) trims the prompt and calls `App.handleSubmit`, which POSTs via `submitTask` (`src/api.ts`). While the request is in flight the form is disabled and the button reads "Running…".
 2. The response (a full task with `steps`) becomes `activeTask` state in `App.tsx`, rendering **`ResultPanel`** (prompt + final result) and **`ExecutionTrace`** (the ordered step list — steps with a `tool_name` get a `tool` CSS class so tool execution is visually distinct from bookkeeping steps).
-3. `App` also bumps a `historyVersion` counter used as **`TaskHistory`**'s `key` — remounting it after each submit so it refetches the list. History rows show prompt + result; clicking one calls `fetchTask(id)` and swaps that task (with its trace) in as `activeTask`.
+3. `App` also bumps a `historyVersion` counter used as **`TaskHistory`**'s `key` — remounting it after each submit so it refetches the list. History rows show prompt + result and expand in place (one open at a time); the first expand calls `fetchTask(id)` for the steps and caches them. The featured task (`activeTask`) is excluded from the list via `excludeTaskId`.
 4. Any API error surfaces as a dismissable-by-resubmit error banner in `App`.
 
 ## Code map
@@ -18,10 +18,10 @@ The API contract this consumes is documented by the backend's auto-generated Ope
 | `src/api.ts` | `submitTask` / `fetchTasks` / `fetchTask` fetch wrappers against `BASE_URL = http://localhost:8000/api` (hardcoded — the backend allows the Vite origin via CORS; there's no dev-server proxy). Also contains a dormant mock backend behind `USE_MOCK = false`, kept from before the real API existed — flip the flag to demo the UI without a backend, or delete the section below the marker comment. |
 | `src/types.ts` | `ExecutionStep`, `TaskSummary` (list shape, no steps), and `Task extends TaskSummary` (adds `steps`) — mirrors the API response shapes (see the backend's OpenAPI schema). |
 | `src/App.tsx` | State owner: `activeTask`, `isSubmitting`, `error`, `historyVersion`. Wires the four components. |
-| `src/components/TaskInput.tsx` | Controlled input + submit button; ignores empty/whitespace prompts. |
+| `src/components/TaskInput.tsx` | Tool chips (one per tool, click to fill the input with a known-good example phrasing) + controlled input + submit button; ignores empty/whitespace prompts. |
 | `src/components/ResultPanel.tsx` | Renders the active task's prompt and result. |
 | `src/components/ExecutionTrace.tsx` | Ordered trace list; renders nothing if there are no steps. |
-| `src/components/TaskHistory.tsx` | Fetches the task list on mount (with a cancellation flag to avoid setting state after unmount); renders the sidebar `<aside>` itself and returns `null` until there is something to browse besides the on-screen task (more than one task, or a lone task with nothing displayed — sticky once shown for the life of the mount); row click reports the id up via `onSelectTask`. |
+| `src/components/TaskHistory.tsx` | Fetches the task list on mount (with a cancellation flag to avoid setting state after unmount); renders "Earlier"/"History" rows that expand their trace inline — steps are lazily fetched on first open and cached (`'failed'` entries retry on the next expand); renders nothing only when the filtered list is empty. |
 | `src/App.css`, `src/index.css` | Plain CSS — one accent color, system font stack. |
 
 ## Commands
