@@ -28,7 +28,7 @@ Division by zero and malformed expressions raise `ToolError`; whole-number resul
 
 
 ### `TextProcessorTool`
-Matches on `uppercase` / `lowercase` / `word count` keywords, strips the instruction words from the prompt, and applies the operation to what remains.
+Matches on `uppercase` / `lowercase` / `word count` / `reverse` keywords, strips the instruction words from the prompt, and applies the operation to what remains.
 
 ### `WeatherMockTool`
 Matches on `weather`; returns canned data for Toronto/Vancouver/Montreal and a default response for any other city. No external API.

@@ -1,6 +1,6 @@
 # Frontend — implementation guide
 
-React 19 + TypeScript + Vite. Four focused components wired from `App.tsx` with plain `useState`/`useEffect` — no state library, no router, deliberately not a chat UI. The flow is: submit a task → see the result and its execution trace → click a past task in the history sidebar to inspect its trace. The layout is two-pane: input/result/trace in the main column, history in a sticky sidebar that only renders once there is more than one task (below 900px it stacks under the main column).
+React 19 + TypeScript + Vite. Four focused components wired from `App.tsx` with plain `useState`/`useEffect` — no state library, no router, deliberately not a chat UI. The flow is: submit a task → see the result and its execution trace → click a past task in the history sidebar to inspect its trace. The layout is two-pane: input/result/trace in the main column, history in a sticky sidebar that only renders once there is something to browse besides the on-screen task (below 900px it stacks under the main column).
 
 The API contract this consumes is documented by the backend's auto-generated OpenAPI schema (`/api/openapi.json`, rendered by Swagger UI at `/`); the server side is documented in [`backend/README.md`](../backend/README.md).
 
@@ -21,7 +21,7 @@ The API contract this consumes is documented by the backend's auto-generated Ope
 | `src/components/TaskInput.tsx` | Controlled input + submit button; ignores empty/whitespace prompts. |
 | `src/components/ResultPanel.tsx` | Renders the active task's prompt and result. |
 | `src/components/ExecutionTrace.tsx` | Ordered trace list; renders nothing if there are no steps. |
-| `src/components/TaskHistory.tsx` | Fetches the task list on mount (with a cancellation flag to avoid setting state after unmount); renders the sidebar `<aside>` itself and returns `null` while loading or when there are fewer than two tasks; row click reports the id up via `onSelectTask`. |
+| `src/components/TaskHistory.tsx` | Fetches the task list on mount (with a cancellation flag to avoid setting state after unmount); renders the sidebar `<aside>` itself and returns `null` until there is something to browse besides the on-screen task (more than one task, or a lone task with nothing displayed — sticky once shown for the life of the mount); row click reports the id up via `onSelectTask`. |
 | `src/App.css`, `src/index.css` | Plain CSS — one accent color, system font stack. |
 
 ## Commands

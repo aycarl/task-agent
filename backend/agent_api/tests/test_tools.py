@@ -57,6 +57,11 @@ def test_text_processor_word_count():
     assert TextProcessorTool().run("word count of 'one two three'") == "3"
 
 
+def test_text_processor_reverse():
+    """Test reversing text."""
+    assert TextProcessorTool().run("reverse 'hello world'") == "dlrow olleh"
+
+
 def test_weather_known_city():
     """Test fetching weather for a known city."""
     assert "Toronto" in WeatherMockTool().run("weather in Toronto")

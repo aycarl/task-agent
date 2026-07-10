@@ -103,13 +103,17 @@ class TextProcessorTool(BaseTool):
 
     def can_handle(self, prompt: str) -> bool:
         return any(
-            k in prompt.lower() for k in ["uppercase", "lowercase", "word count"]
+            k in prompt.lower()
+            for k in ["uppercase", "lowercase", "word count", "reverse"]
         )
 
     def run(self, prompt: str) -> str:
         lower = prompt.lower()
         text = re.sub(
-            r"(convert|to|uppercase|lowercase|word count|of)", "", lower, flags=re.I
+            r"(convert|to|uppercase|lowercase|word count|reverse|of)",
+            "",
+            lower,
+            flags=re.I,
         ).strip(" '\"")
         if "uppercase" in lower:
             return text.upper()
@@ -117,6 +121,8 @@ class TextProcessorTool(BaseTool):
             return text.lower()
         if "word count" in lower:
             return str(len(text.split()))
+        if "reverse" in lower:
+            return text[::-1]
         raise ToolError("No recognized text operation in prompt")
 
 
