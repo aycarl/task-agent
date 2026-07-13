@@ -2,6 +2,12 @@
 
 A task submitted through the UI is passed to an `AgentController`, which selects and runs a `Tool` (calculator, text processing, mock weather, days-since-a-date, current time in a city), then returns the result plus a structured execution trace. The UI shows the result, past-task history, and the step-by-step trace for any task.
 
+**Video demo:**
+
+https://github.com/user-attachments/assets/a7de2594-1c98-4b05-add2-8a164b3d350d
+
+
+
 ## Tech Stack and Dependencies
 
 ### Backend
